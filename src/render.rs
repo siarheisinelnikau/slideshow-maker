@@ -130,7 +130,7 @@ impl Renderer {
                     (i64::from(h) - i64::from(rh)) / 2,
                 );
                 if !slide.caption.trim().is_empty() {
-                    caption(&mut out, &slide.caption, fg, false)?;
+                    caption(&mut out, &slide.caption, [250, 250, 248], false)?;
                 }
             }
             Media::Title => {
