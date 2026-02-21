@@ -30,11 +30,15 @@ pub fn load_project(path: &Path) -> Result<Project> {
 }
 pub fn save_project(path: &Path, project: &Project) -> Result<()> {
     project.validate()?;
+    let destination = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let same_source = |source: &Path| {
+        std::fs::canonicalize(source).unwrap_or_else(|_| source.to_path_buf()) == destination
+    };
     if project
         .slides
         .iter()
-        .any(|s| matches!(&s.media,Media::Photo(p) if p==path))
-        || project.audio.as_deref() == Some(path)
+        .any(|s| matches!(&s.media,Media::Photo(p) if same_source(p)))
+        || project.audio.as_deref().is_some_and(same_source)
     {
         return Err("A project cannot overwrite source media".into());
     }
