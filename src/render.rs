@@ -238,7 +238,7 @@ mod tests {
     use super::*;
     #[test]
     fn fit_preserves_edges_fill_is_explicit_and_transition_blends() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::fixture_dir();
         let path = dir.path().join("wide.png");
         RgbImage::from_pixel(200, 100, Rgb([255, 0, 0]))
             .save(&path)
