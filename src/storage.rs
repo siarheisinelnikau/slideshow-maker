@@ -77,7 +77,7 @@ mod tests {
     use super::*;
     #[test]
     fn project_roundtrip_and_reject_unknown_version() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::fixture_dir();
         let path = dir.path().join("test.slideshow.json");
         let p = Project {
             slides: vec![Slide::photo(PathBuf::from("photo.png"))],

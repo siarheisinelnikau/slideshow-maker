@@ -200,16 +200,16 @@ impl Project {
     }
     pub fn resolve_paths(&mut self, base: &Path) {
         for s in &mut self.slides {
-            if let Media::Photo(p) = &mut s.media {
-                if p.is_relative() {
-                    *p = base.join(&*p);
-                }
-            }
-        }
-        if let Some(p) = &mut self.audio {
-            if p.is_relative() {
+            if let Media::Photo(p) = &mut s.media
+                && p.is_relative()
+            {
                 *p = base.join(&*p);
             }
+        }
+        if let Some(p) = &mut self.audio
+            && p.is_relative()
+        {
+            *p = base.join(&*p);
         }
     }
 }
@@ -233,8 +233,10 @@ mod tests {
     }
     #[test]
     fn rejects_invalid_files() {
-        let mut p = Project::default();
-        p.fps = 0;
+        let mut p = Project {
+            fps: 0,
+            ..Project::default()
+        };
         assert!(p.validate().is_err());
         p.fps = 24;
         p.slides.push(Slide::title());

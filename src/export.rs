@@ -243,7 +243,7 @@ mod tests {
     use super::*;
     #[test]
     fn exports_real_jpeg_frames_and_cancels_without_publishing() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::fixture_dir();
         let path = dir.path().join("movie.avi");
         let mut slide = Slide::title();
         slide.seconds = 0.5;

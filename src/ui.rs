@@ -703,7 +703,7 @@ impl eframe::App for Editor {
                 ui.allocate_ui(available.max(egui::vec2(1.0,1.0)),|ui|{ui.centered_and_justified(|ui|{ui.label("Your memories start here\nAdd photos, arrange them, and tell your story.");});});
             }
             ui.horizontal(|ui| {
-                if ui.add_enabled(!self.project.slides.is_empty() && self.progress.is_none(),egui::Button::new(if self.playing{"Pause"}else{"Play silent preview"})).clicked(){self.playing=!self.playing;self.last_tick=Instant::now();}
+                if ui.add_enabled(!self.project.slides.is_empty() && self.progress.is_none(),egui::Button::new(if self.playing{"Pause"}else{"Play silent preview"})).clicked(){self.playing = !self.playing;self.last_tick=Instant::now();}
                 let duration=self.project.duration().max(0.001);self.time=self.time.clamp(0.0,duration);
                 if ui.add(egui::Slider::new(&mut self.time,0.0..=duration).show_value(false)).changed(){self.revision+=1;self.playing=false;}
                 ui.label(format!("{:.1} / {:.1}s",self.time,self.project.duration()));
