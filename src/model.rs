@@ -92,7 +92,7 @@ impl Slide {
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct Project {
     pub format_version: u32,
     pub name: String,

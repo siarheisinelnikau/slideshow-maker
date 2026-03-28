@@ -607,7 +607,7 @@ impl Editor {
             if self.update.is_some() && self.staged.is_none() && ui.add_enabled(!self.net_busy,egui::Button::new("Download and install")).clicked(){self.download(ctx);}
             if self.net_busy && let Some(update)=&self.update {ui.add(egui::ProgressBar::new(self.downloaded.load(Ordering::Relaxed) as f32/update.size as f32).show_percentage());ctx.request_repaint_after(Duration::from_millis(250));}
             if let Some(staged)=&self.staged {
-                if ui.add_enabled(!self.dirty && !self.worker.busy,egui::Button::new("Restart to install verified update")).clicked() {
+                if ui.add_enabled(!self.dirty && !self.worker.busy && !self.save_settings,egui::Button::new("Restart to install verified update")).clicked() {
                     match updater::restart_install(staged){Ok(())=>{self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}
                 }
                 if self.dirty{ui.label("Save your project before installing the update.");}
@@ -626,7 +626,7 @@ impl eframe::App for Editor {
         let ctx = ui.ctx().clone();
         self.receive(&ctx);
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close {
-            if self.worker.busy || self.net_busy {
+            if self.worker.busy || self.net_busy || self.save_settings {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.message =
                     "Wait for the current operation or cancel the export before closing.".into();
