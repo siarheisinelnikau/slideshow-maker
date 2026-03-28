@@ -15,8 +15,8 @@ try {
     $movedOriginal = $true
     Move-Item -LiteralPath $StagedPath -Destination $TargetPath
     Start-Process -FilePath $TargetPath -WorkingDirectory (Split-Path -Parent $TargetPath)
-    Remove-Item -LiteralPath $backupPath
-    if (Test-Path -LiteralPath $failurePath) { Remove-Item -LiteralPath $failurePath }
+    Remove-Item -LiteralPath $backupPath -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $failurePath) { Remove-Item -LiteralPath $failurePath -ErrorAction SilentlyContinue }
 } catch {
     if ($movedOriginal -and (Test-Path -LiteralPath $backupPath)) {
         if (Test-Path -LiteralPath $TargetPath) { Remove-Item -LiteralPath $TargetPath }

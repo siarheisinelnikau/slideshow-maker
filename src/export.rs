@@ -108,6 +108,7 @@ pub fn export(
     drop(writer);
     progress.check()?;
     let final_path = if format == Format::Mp4 {
+        progress.done.store(0, Ordering::Relaxed);
         progress.encoding.store(true, Ordering::Relaxed);
         let output = temp.path().join("encoded.mp4");
         transcode(ffmpeg.unwrap(), &avi_path, &output, progress)?;
