@@ -25,7 +25,7 @@ Project files save atomically. Existing export files are never overwritten, incl
 | Frame rates | 12, 24 or 30 fps |
 | Timeline | Up to 500 slides, 0.5–120 seconds each, one hour total |
 | Intermediate size | AVI is limited to 2 GB, including MP4's intermediate AVI |
-| Input limits | JPEG/PNG/WebP/BMP; still frame of animated sources; decoder allocation capped at 256 MiB, dimensions at 16,000 per side |
+| Input limits | JPEG/PNG/WebP/BMP; still frame of animated sources; transparency flattened over black; decoder allocation capped at 256 MiB, dimensions at 16,000 per side |
 | Composition | Two-photo cache; oriented images scaled to at most 2048 per side; captions use embedded Ubuntu Light |
 | Not supported | Video-clip import, HEIC/RAW, MP3, recorded narration, sound playback, 3D effects, pan/zoom, undo/redo, portable project bundles |
 

@@ -75,10 +75,15 @@ impl Audio {
         let end = u64::from(n + 1) * u64::from(self.rate) / u64::from(fps);
         let total = u64::from(video_frames) * u64::from(self.rate) / u64::from(fps);
         let source_frames = self.samples.len() / self.channels as usize;
+        let audible_end = if repeat {
+            total
+        } else {
+            total.min(source_frames as u64)
+        };
         let mut bytes = Vec::with_capacity((end - first) as usize * self.channels as usize * 2);
         for f in first..end {
             let fade = ((f as f32 / (self.rate as f32 * 0.5))
-                .min((total - f) as f32 / (self.rate as f32 * 0.5)))
+                .min(audible_end.saturating_sub(f) as f32 / (self.rate as f32 * 0.5)))
             .clamp(0.0, 1.0);
             for c in 0..self.channels as usize {
                 let sample = if repeat || f < (source_frames as u64) {
@@ -262,6 +267,18 @@ impl<W: Write + Seek> Avi<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn short_soundtrack_fades_before_silence_and_loop_fills() {
+        let audio = Audio {
+            rate: 8000,
+            channels: 1,
+            samples: vec![1000; 8000],
+        };
+        let ending = audio.frame(23, 24, 48, 1.0, false);
+        assert_eq!(&ending[ending.len() - 2..], &[0, 0]);
+        assert!(audio.frame(24, 24, 48, 1.0, false).iter().all(|b| *b == 0));
+        assert!(audio.frame(24, 24, 48, 1.0, true).iter().any(|b| *b != 0));
+    }
     #[test]
     fn riff_sizes_indexes_and_pcm_are_consistent() {
         let audio = Audio {
