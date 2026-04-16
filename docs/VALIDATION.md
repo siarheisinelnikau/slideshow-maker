@@ -12,12 +12,15 @@ Results from this session (2026-10-31):
 | `cargo check --offline --all-targets` | Passed |
 | Formatting | Passed |
 | Clippy on all targets with `-D warnings` | Passed |
-| Rust tests on all targets | 8 passed, 0 failed |
+| Rust tests on all targets | 9 passed, 0 failed |
 | Synthetic 2.5-second video export | Passed; generated 30 MJPEG frames plus PCM16 soundtrack |
 | Independent OpenCV/FFmpeg decoding | All 30 frames decoded at 640×360, 12 fps; RIFF lengths and 40,000 PCM bytes validated |
 | Documentation relative links | Passed; no missing local targets |
 | PowerShell package/helper syntax parsing | Passed without executing either script |
 | `powershell -NoProfile -NonInteractive -File scripts/package.ps1` | Blocked by `AuthorizationManager check failed`; execution policy was not modified |
+| Direct Windows x64 release build with static MSVC runtime | Passed; optimized build completed in 7m 03s |
+| Packaged asset PE/checksum inspection | Passed; Windows x64 GUI executable, matching SHA-256, no imported MSVC redistributable DLL |
+| GitHub CI workflow | Prepared locally; not run remotely |
 | GUI, playback, FFmpeg executable, update network/install | Deferred by session restrictions or unavailable engine |
 
 The first two storage/export tests failed when using the system temporary directory: this managed environment denied temporary-file rename there (`Access is denied`, OS error 5). Fixtures were moved to a temporary subdirectory of this repository's ignored `.test-output`; all tests then passed. The environment also emitted an incremental-cache hard-link warning and used copies; it did not prevent builds or tests.
@@ -41,7 +44,13 @@ The direct release-build command used after the blocked script invocation is:
 cargo --config 'target.x86_64-pc-windows-msvc.rustflags=["-C","target-feature=+crt-static"]' build --offline --locked --release --target x86_64-pc-windows-msvc --jobs 2 --target-dir target
 ```
 
-Final release-build and asset details are appended after compilation finishes. No executable will be launched as part of packaging.
+Packaging used direct repository-local file copies and `Get-FileHash` after the blocked script invocation; no execution-policy setting was changed. The application executable was not launched. The final local asset is `dist/SlideshowMaker-v0.1.0.exe`, 10,868,736 bytes. Its SHA-256 is:
+
+```text
+830a5abe6a336c9364fee6407c5d346071412256754d777b38d3e3f00e8719f3
+```
+
+The `.exe.sha256`, MIT license, font notices, and dependency declaration inventory are beside it in `dist`. Build/output directories are intentionally ignored by Git; source, lockfile, scripts, and this validation record are committed. No repository, PR or release was published.
 
 The Rust tests exercise timing/rescaling, validation, Fit/Fill compositing and transitions, project round trips, AVI RIFF/index structure, per-frame audio sample counts, decodable JPEG frames, cancellation/no-clobber, semantic release handling, and checksum corruption. The fixture builds a 2.5-second 640×360, 12 fps slideshow with two generated photos, a title, transitions and a generated PCM16 tone. The Python verifier uses an independent installed OpenCV/FFmpeg decoder to decode every frame and separately parses the PCM chunks without playing them.
 
