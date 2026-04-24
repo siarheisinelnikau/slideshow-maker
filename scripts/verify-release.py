@@ -39,5 +39,6 @@ if imports_rva:
         imports.append(data[name_at:data.index(b"\0", name_at)].decode("ascii"))
         entry += 20
 assert not any(name.lower().startswith(("vcruntime", "msvcp")) for name in imports), imports
-print(f"PASS: Windows x64 GUI PE, {len(data):,} bytes, matching SHA-256; no imported MSVC redistributable DLL")
+assert not any(name.lower().startswith(("opengl", "d3d", "dxgi")) for name in imports), imports
+print(f"PASS: Windows x64 GUI PE, {len(data):,} bytes, matching SHA-256; no imported MSVC redistributable or OpenGL/Direct3D DLL")
 print("Imported DLLs: " + ", ".join(imports))
