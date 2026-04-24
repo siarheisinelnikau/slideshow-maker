@@ -1,4 +1,4 @@
-use eframe::egui::{self, Color32, RichText};
+use egui::{self, Color32, RichText};
 use slideshow_maker::{
     export::{self, Format, Progress},
     model::*,
@@ -193,10 +193,12 @@ pub struct Editor {
     installing: bool,
 }
 impl Editor {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        cc.egui_ctx.set_theme(egui::Theme::Dark);
+    pub fn new(ctx: egui::Context) -> Self {
+        Self::with_context(ctx, storage::load_settings())
+    }
+    fn with_context(ctx: egui::Context, settings: Settings) -> Self {
+        ctx.set_theme(egui::Theme::Dark);
         let (net_tx, net_rx) = mpsc::sync_channel(1);
-        let settings = storage::load_settings();
         let mut app = Self {
             project: Project::default(),
             path: None,
@@ -205,7 +207,7 @@ impl Editor {
             time: 0.0,
             revision: 1,
             preview_revision: 0,
-            worker: Worker::new(cc.egui_ctx.clone()),
+            worker: Worker::new(ctx.clone()),
             texture: None,
             message: "Add photos or a title card to begin. Source files are never modified.".into(),
             playing: false,
@@ -228,7 +230,7 @@ impl Editor {
             installing: false,
         };
         if app.settings.startup_updates {
-            app.check_updates(&cc.egui_ctx);
+            app.check_updates(&ctx);
         }
         app
     }
@@ -283,6 +285,7 @@ impl Editor {
         match action {
             Discard::New => {
                 self.project = Project::default();
+                self.selected = 0;
                 self.path = None;
                 self.dirty = false;
                 self.time = 0.0;
@@ -292,7 +295,6 @@ impl Editor {
             }
             Discard::Open => self.worker.send(Job::Open, "Opening project…"),
             Discard::Close => {
-                self.installing = true;
                 self.allow_close = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
@@ -608,7 +610,7 @@ impl Editor {
             if self.net_busy && let Some(update)=&self.update {ui.add(egui::ProgressBar::new(self.downloaded.load(Ordering::Relaxed) as f32/update.size as f32).show_percentage());ctx.request_repaint_after(Duration::from_millis(250));}
             if let Some(staged)=&self.staged {
                 if ui.add_enabled(!self.dirty && !self.worker.busy && !self.save_settings,egui::Button::new("Restart to install verified update")).clicked() {
-                    match updater::restart_install(staged){Ok(())=>{self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}
+                    match updater::restart_install(staged){Ok(())=>{self.installing=true;self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}
                 }
                 if self.dirty{ui.label("Save your project before installing the update.");}
             }
@@ -621,9 +623,9 @@ impl Editor {
         self.show_settings = open;
     }
 }
-impl eframe::App for Editor {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let ctx = ui.ctx().clone();
+impl Editor {
+    pub fn update(&mut self, ctx: &egui::Context) {
+        let ctx = ctx.clone();
         self.receive(&ctx);
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close {
             if self.worker.busy || self.net_busy || self.save_settings {
@@ -657,8 +659,8 @@ impl eframe::App for Editor {
                 Duration::from_millis(83).saturating_sub(self.last_tick.elapsed()),
             );
         }
-        egui::Panel::top("toolbar").show(ui, |ui| self.toolbar(ui, &ctx));
-        egui::Panel::bottom("status").show(ui, |ui| {
+        egui::TopBottomPanel::top("toolbar").show(&ctx, |ui| self.toolbar(ui, &ctx));
+        egui::TopBottomPanel::bottom("status").show(&ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 if self.dirty {
                     ui.colored_label(Color32::YELLOW, "Unsaved changes ·");
@@ -684,16 +686,16 @@ impl eframe::App for Editor {
                 ui.label(&self.worker.label);
             }
         });
-        egui::Panel::bottom("timeline")
-            .min_size(132.0)
-            .show(ui, |ui| self.timeline(ui));
-        egui::Panel::right("properties")
-            .default_size(302.0)
+        egui::TopBottomPanel::bottom("timeline")
+            .min_height(132.0)
+            .show(&ctx, |ui| self.timeline(ui));
+        egui::SidePanel::right("properties")
+            .default_width(302.0)
             .resizable(true)
-            .show(ui, |ui| {
+            .show(&ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| self.properties(ui));
             });
-        egui::CentralPanel::default().show(ui,|ui| {
+        egui::CentralPanel::default().show(&ctx,|ui| {
             ui.horizontal(|ui|{ui.heading(&self.project.name);ui.label("Photo story");});
             let available=ui.available_size()-egui::vec2(0.0,68.0);
             if let Some(texture)=&self.texture {
@@ -715,7 +717,7 @@ impl eframe::App for Editor {
             egui::Window::new("Unsaved project")
                 .collapsible(false)
                 .resizable(false)
-                .show(ui, |ui| {
+                .show(&ctx, |ui| {
                     ui.label("Save your project first, or discard these changes.");
                     if ui.button("Keep editing").clicked() {
                         self.discard = None;
@@ -740,7 +742,7 @@ impl eframe::App for Editor {
             }
         }
     }
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    pub fn shutdown(&mut self) {
         if let Some(progress) = &self.progress {
             progress.cancel();
         }
@@ -749,5 +751,49 @@ impl eframe::App for Editor {
         {
             let _ = std::fs::remove_file(staged.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn editor() -> Editor {
+        Editor::with_context(
+            egui::Context::default(),
+            Settings {
+                startup_updates: false,
+                ffmpeg: None,
+            },
+        )
+    }
+    #[test]
+    fn new_project_resets_selection_and_does_not_start_network() {
+        let mut app = editor();
+        app.selected = 20;
+        app.discard_action(Discard::New, &egui::Context::default());
+        assert_eq!(app.selected, 0);
+        assert!(!app.net_busy);
+        assert!(!app.project.duration().is_sign_negative());
+    }
+    #[test]
+    fn ordinary_close_removes_staged_download_without_installing() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".test-output");
+        std::fs::create_dir_all(&root).unwrap();
+        let dir = tempfile::tempdir_in(root).unwrap();
+        let path = dir.path().join("unused-update.exe");
+        std::fs::write(&path, b"synthetic staged data").unwrap();
+        let mut app = editor();
+        app.staged = Some(Staged {
+            path: path.clone(),
+            target: dir.path().join("app.exe"),
+            version: semver::Version::new(0, 2, 0),
+        });
+        app.discard_action(Discard::Close, &egui::Context::default());
+        app.shutdown();
+        assert!(
+            !path.exists(),
+            "Closing without installing must discard the staged download"
+        );
     }
 }

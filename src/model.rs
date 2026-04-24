@@ -127,7 +127,9 @@ impl Default for Project {
 }
 impl Project {
     pub fn duration(&self) -> f64 {
-        self.slides.iter().map(|s| s.seconds).sum()
+        self.slides
+            .iter()
+            .fold(0.0, |total, slide| total + slide.seconds)
     }
     pub fn frames(&self) -> u32 {
         (self.duration() * self.fps as f64).ceil() as u32
