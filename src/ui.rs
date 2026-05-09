@@ -1,4 +1,5 @@
 use egui::{self, Color32, RichText};
+mod screens;
 use slideshow_maker::{
     export::{self, Format, Progress},
     model::*,
@@ -177,6 +178,8 @@ pub struct Editor {
     last_tick: Instant,
     settings: Settings,
     show_settings: bool,
+    show_export: bool,
+    inspector_tab: screens::InspectorTab,
     save_settings: bool,
     total_input: f64,
     format: Format,
@@ -194,12 +197,16 @@ pub struct Editor {
 }
 impl Editor {
     pub fn new(ctx: egui::Context) -> Self {
-        Self::with_context(ctx, storage::load_settings())
+        let mut app = Self::with_context(ctx.clone(), storage::load_settings());
+        if app.settings.startup_updates {
+            app.check_updates(&ctx);
+        }
+        app
     }
     fn with_context(ctx: egui::Context, settings: Settings) -> Self {
-        ctx.set_theme(egui::Theme::Dark);
+        screens::configure(&ctx);
         let (net_tx, net_rx) = mpsc::sync_channel(1);
-        let mut app = Self {
+        Self {
             project: Project::default(),
             path: None,
             dirty: false,
@@ -214,6 +221,8 @@ impl Editor {
             last_tick: Instant::now(),
             settings,
             show_settings: false,
+            show_export: false,
+            inspector_tab: Default::default(),
             save_settings: false,
             total_input: 0.0,
             format: Format::Avi,
@@ -228,13 +237,31 @@ impl Editor {
             discard: None,
             allow_close: false,
             installing: false,
-        };
-        if app.settings.startup_updates {
-            app.check_updates(&ctx);
         }
-        app
+    }
+    pub(crate) fn for_capture(ctx: egui::Context, project: Project, screen: &str) -> Result<Self> {
+        project.validate()?;
+        let mut app = Self::with_context(ctx.clone(), Settings::default());
+        app.project = project;
+        app.total_input = app.project.duration();
+        app.show_settings = screen == "settings";
+        app.show_export = screen == "export";
+        app.message = "Your originals stay unchanged.".into();
+        if !app.project.slides.is_empty() {
+            let image =
+                Renderer::default().frame(&app.project, 0.0, app.project.layout.size(360))?;
+            let size = [image.width() as usize, image.height() as usize];
+            app.texture = Some(ctx.load_texture(
+                "composite",
+                egui::ColorImage::from_rgb(size, image.as_raw()),
+                egui::TextureOptions::LINEAR,
+            ));
+        }
+        app.preview_revision = app.revision;
+        Ok(app)
     }
     fn change(&mut self) {
+        self.playing = false;
         self.dirty = true;
         self.revision += 1;
         self.total_input = self.project.duration();
@@ -401,227 +428,6 @@ impl Editor {
             }
         }
     }
-    fn toolbar(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.horizontal(|ui| {
-            ui.heading(RichText::new("SlideshowMaker").color(Color32::from_rgb(126, 220, 198)));
-            ui.separator();
-            let enabled = !self.worker.busy;
-            ui.add_enabled_ui(enabled, |ui| {
-                if ui.button("New").clicked() {
-                    self.request_discard(Discard::New, ctx);
-                }
-                if ui.button("Open…").clicked() {
-                    self.request_discard(Discard::Open, ctx);
-                }
-                if ui.button("Save").clicked() {
-                    self.worker.send(
-                        Job::Save(self.project.clone(), self.path.clone()),
-                        "Saving project…",
-                    );
-                    self.playing = false;
-                }
-                if ui.button("Save as…").clicked() {
-                    self.worker
-                        .send(Job::Save(self.project.clone(), None), "Saving project…");
-                    self.playing = false;
-                }
-                ui.separator();
-                if ui.button("Add photos…").clicked() {
-                    self.worker.send(Job::Import, "Choosing photos…");
-                    self.playing = false;
-                }
-                if ui
-                    .add_enabled(
-                        self.project.slides.len() < 500,
-                        egui::Button::new("Add title"),
-                    )
-                    .clicked()
-                {
-                    self.project.slides.push(Slide::title());
-                    self.selected = self.project.slides.len() - 1;
-                    self.time = self.project.duration() - 3.0;
-                    self.change();
-                }
-            });
-            if ui.button("Settings").clicked() {
-                self.show_settings = true;
-            }
-            if self.update.is_some() {
-                ui.colored_label(Color32::LIGHT_GREEN, "Update available");
-            }
-        });
-    }
-    fn properties(&mut self, ui: &mut egui::Ui) {
-        let busy = self.worker.busy;
-        ui.heading("Make it yours");
-        ui.add_enabled_ui(!busy,|ui| {
-            let mut changed=false;
-            ui.label("Project name");changed|=ui.text_edit_singleline(&mut self.project.name).changed();
-            ui.horizontal(|ui| {ui.label("Layout");egui::ComboBox::from_id_salt("layout").selected_text(format!("{:?}",self.project.layout)).show_ui(ui,|ui| {
-                for value in [Layout::Landscape,Layout::Portrait,Layout::Square] {changed|=ui.selectable_value(&mut self.project.layout,value,format!("{value:?}")).changed();}
-            });});
-            ui.horizontal(|ui| {ui.label("Template");egui::ComboBox::from_id_salt("theme").selected_text(format!("{:?}",self.project.theme)).show_ui(ui,|ui| {
-                for value in [Theme::Midnight,Theme::WarmPaper,Theme::Ocean] {changed|=ui.selectable_value(&mut self.project.theme,value,format!("{value:?}")).changed();}
-            });});
-            egui::ComboBox::from_label("Transition").selected_text(format!("{:?}",self.project.transition)).show_ui(ui,|ui| {
-                for value in [Transition::Cut,Transition::Dissolve,Transition::FadeThroughBackground] {changed|=ui.selectable_value(&mut self.project.transition,value,format!("{value:?}")).changed();}
-            });
-            changed|=ui.add(egui::Slider::new(&mut self.project.transition_seconds,0.0..=2.0).text("Transition sec")).changed();
-            ui.separator();ui.strong("Selected slide");
-            if let Some(slide)=self.project.slides.get_mut(self.selected) {
-                ui.label(slide.label());ui.label("Caption / title (up to 500 characters)");
-                changed|=ui.add(egui::TextEdit::multiline(&mut slide.caption).desired_rows(3).char_limit(500)).changed();
-                changed|=ui.add(egui::Slider::new(&mut slide.seconds,0.5..=120.0).logarithmic(true).text("Seconds")).changed();
-                if matches!(slide.media,Media::Photo(_)) {
-                    ui.horizontal(|ui| {changed|=ui.selectable_value(&mut slide.fit,Fit::Fit,"Fit (whole photo)").changed();changed|=ui.selectable_value(&mut slide.fit,Fit::Fill,"Fill (crop)").changed();});
-                    ui.horizontal(|ui| {
-                        if ui.button("Rotate 90°").clicked() {slide.rotation=(slide.rotation+1)%4;changed=true;}
-                        if ui.button("Relink photo…").clicked() {self.worker.send(Job::Relink(self.selected),"Choosing replacement photo…");}
-                    });
-                }
-            }else{ui.label("Add a photo or title card.");}
-            ui.separator();ui.strong("Music");
-            if let Some(path)=&self.project.audio {ui.label(path.file_name().unwrap_or_default().to_string_lossy());}
-            ui.horizontal(|ui| {
-                if ui.button("Choose WAV…").clicked() {self.worker.send(Job::Music,"Choosing music…");self.playing=false;}
-                if self.project.audio.is_some() && ui.button("Remove").clicked() {self.project.audio=None;changed=true;}
-            });
-            changed|=ui.add(egui::Slider::new(&mut self.project.audio_volume,0.0..=1.0).text("Volume")).changed();
-            changed|=ui.checkbox(&mut self.project.audio_loop,"Repeat music to fill video").changed();
-            ui.small("PCM 16-bit WAV, mono/stereo. Export includes fades. Preview is silent.");
-            ui.separator();ui.strong("Export");
-            ui.horizontal(|ui| {ui.label("Height");for h in [360,720,1080] {changed|=ui.selectable_value(&mut self.project.height,h,h.to_string()).changed();}});
-            ui.horizontal(|ui| {ui.label("FPS");for f in [12,24,30] {changed|=ui.selectable_value(&mut self.project.fps,f,f.to_string()).changed();}});
-            ui.horizontal(|ui| {ui.selectable_value(&mut self.format,Format::Avi,"AVI (built in)");ui.selectable_value(&mut self.format,Format::Mp4,"MP4 (FFmpeg)");});
-            if self.format==Format::Mp4 && self.settings.ffmpeg.is_none(){ui.colored_label(Color32::YELLOW,"Choose FFmpeg in Settings for MP4.");}
-            if ui.add_enabled(!self.project.slides.is_empty() && (self.format==Format::Avi || self.settings.ffmpeg.is_some()),egui::Button::new("Export video…")).clicked() {
-                let progress=Progress::default();self.worker.send(Job::Export(self.project.clone(),self.format,self.settings.ffmpeg.clone(),progress.clone()),"Exporting video…");self.progress=Some(progress);self.playing=false;
-            }
-            ui.small("AVI uses MJPEG and PCM audio, with a 2 GB limit. Existing videos are never overwritten.");
-            if changed {self.change();}
-        });
-    }
-    fn timeline(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.strong(format!(
-                "Timeline · {} slides · {:.1}s",
-                self.project.slides.len(),
-                self.project.duration()
-            ));
-            ui.add_enabled_ui(!self.worker.busy, |ui| {
-                ui.label("Total seconds");
-                ui.add(
-                    egui::DragValue::new(&mut self.total_input)
-                        .range(0.5..=3600.0)
-                        .speed(0.5),
-                );
-                if ui.button("Apply total").clicked() {
-                    match self.project.set_total(self.total_input) {
-                        Ok(()) => self.change(),
-                        Err(e) => self.message = e,
-                    }
-                }
-            });
-        });
-        let mut select = None;
-        let mut action = None;
-        let mut start = 0.0;
-        egui::ScrollArea::horizontal()
-            .max_height(112.0)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    for (i, slide) in self.project.slides.iter().enumerate() {
-                        ui.group(|ui| {
-                            ui.set_min_width(156.0);
-                            ui.set_max_width(156.0);
-                            if ui
-                                .selectable_label(
-                                    i == self.selected,
-                                    format!("{} · {:.1}s", i + 1, slide.seconds),
-                                )
-                                .clicked()
-                            {
-                                select = Some((i, start));
-                            }
-                            ui.label(egui::RichText::new(slide.label()).small());
-                            ui.horizontal(|ui| {
-                                ui.add_enabled_ui(!self.worker.busy, |ui| {
-                                    if ui.add_enabled(i > 0, egui::Button::new("←")).clicked() {
-                                        action = Some((i, 0));
-                                    }
-                                    if ui
-                                        .add_enabled(
-                                            i + 1 < self.project.slides.len(),
-                                            egui::Button::new("→"),
-                                        )
-                                        .clicked()
-                                    {
-                                        action = Some((i, 1));
-                                    }
-                                    if ui.button("Delete").clicked() {
-                                        action = Some((i, 2));
-                                    }
-                                });
-                            });
-                        });
-                        start += slide.seconds;
-                    }
-                });
-            });
-        if let Some((i, t)) = select {
-            self.selected = i;
-            self.time = t;
-            self.playing = false;
-            self.revision += 1;
-        }
-        if let Some((i, a)) = action {
-            match a {
-                0 => {
-                    self.project.slides.swap(i, i - 1);
-                    self.selected = i - 1;
-                }
-                1 => {
-                    self.project.slides.swap(i, i + 1);
-                    self.selected = i + 1;
-                }
-                _ => {
-                    self.project.slides.remove(i);
-                    self.selected = self
-                        .selected
-                        .min(self.project.slides.len().saturating_sub(1));
-                }
-            }
-            self.change();
-        }
-    }
-    fn settings_window(&mut self, ctx: &egui::Context) {
-        if !self.show_settings {
-            return;
-        }
-        let mut open = true;
-        egui::Window::new("Settings · About & updates").open(&mut open).default_width(520.0).show(ctx,|ui| {
-            ui.heading(format!("SlideshowMaker {}",env!("CARGO_PKG_VERSION")));
-            ui.label("Windows x64 · local processing · no bundled photos or music");
-            if ui.checkbox(&mut self.settings.startup_updates,"Check for updates on startup").changed(){self.save_settings=true;}
-            if self.save_settings {ui.small("Settings change pending save…");}
-            if ui.add_enabled(!self.net_busy,egui::Button::new("Check for updates")).clicked(){self.check_updates(ctx);}
-            ui.label(&self.update_text);
-            if self.update.is_some() && self.staged.is_none() && ui.add_enabled(!self.net_busy,egui::Button::new("Download and install")).clicked(){self.download(ctx);}
-            if self.net_busy && let Some(update)=&self.update {ui.add(egui::ProgressBar::new(self.downloaded.load(Ordering::Relaxed) as f32/update.size as f32).show_percentage());ctx.request_repaint_after(Duration::from_millis(250));}
-            if let Some(staged)=&self.staged {
-                if ui.add_enabled(!self.dirty && !self.worker.busy && !self.save_settings,egui::Button::new("Restart to install verified update")).clicked() {
-                    match updater::restart_install(staged){Ok(())=>{self.installing=true;self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}
-                }
-                if self.dirty{ui.label("Save your project before installing the update.");}
-            }
-            ui.separator();ui.strong("Optional MP4 engine");
-            ui.label("Use your own trusted FFmpeg executable with MPEG-4 and AAC encoders. No engine is bundled or downloaded automatically.");
-            if let Some(path)=&self.settings.ffmpeg {ui.label(path.display().to_string());}
-            if ui.add_enabled(!self.worker.busy,egui::Button::new("Choose FFmpeg executable…")).clicked(){self.worker.send(Job::Ffmpeg,"Choosing FFmpeg…");}
-            ui.small("Clip import, MP3 music, 3D effects and sound playback are not supported in this first version.");
-        });
-        self.show_settings = open;
-    }
 }
 impl Editor {
     pub fn update(&mut self, ctx: &egui::Context) {
@@ -687,32 +493,17 @@ impl Editor {
             }
         });
         egui::TopBottomPanel::bottom("timeline")
-            .min_height(132.0)
+            .min_height(176.0)
             .show(&ctx, |ui| self.timeline(ui));
         egui::SidePanel::right("properties")
-            .default_width(302.0)
+            .default_width(308.0)
             .resizable(true)
             .show(&ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| self.properties(ui));
             });
-        egui::CentralPanel::default().show(&ctx,|ui| {
-            ui.horizontal(|ui|{ui.heading(&self.project.name);ui.label("Photo story");});
-            let available=ui.available_size()-egui::vec2(0.0,68.0);
-            if let Some(texture)=&self.texture {
-                let size=texture.size_vec2();let scale=(available.x/size.x).min(available.y/size.y).max(0.01);
-                ui.vertical_centered(|ui| {ui.add(egui::Image::new(texture).fit_to_exact_size(size*scale));});
-            }else{
-                ui.allocate_ui(available.max(egui::vec2(1.0,1.0)),|ui|{ui.centered_and_justified(|ui|{ui.label("Your memories start here\nAdd photos, arrange them, and tell your story.");});});
-            }
-            ui.horizontal(|ui| {
-                if ui.add_enabled(!self.project.slides.is_empty() && self.progress.is_none(),egui::Button::new(if self.playing{"Pause"}else{"Play silent preview"})).clicked(){self.playing = !self.playing;self.last_tick=Instant::now();}
-                let duration=self.project.duration().max(0.001);self.time=self.time.clamp(0.0,duration);
-                if ui.add(egui::Slider::new(&mut self.time,0.0..=duration).show_value(false)).changed(){self.revision+=1;self.playing=false;}
-                ui.label(format!("{:.1} / {:.1}s",self.time,self.project.duration()));
-            });
-            ui.small("Preview uses the same compositor as export. Music is included only in the exported video.");
-        });
+        self.canvas(&ctx);
         self.settings_window(&ctx);
+        self.export_window(&ctx);
         if let Some(action) = self.discard {
             egui::Window::new("Unsaved project")
                 .collapsible(false)
