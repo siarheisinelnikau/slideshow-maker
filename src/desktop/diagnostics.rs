@@ -121,6 +121,7 @@ impl Desktop {
                 native.window.set_visible(true);
                 self.occluded = false;
                 self.needs_ui = true;
+                self.force_present = true;
                 native.window.request_redraw();
                 d.stage = 3;
                 d.next = Instant::now() + Duration::from_secs(2);
