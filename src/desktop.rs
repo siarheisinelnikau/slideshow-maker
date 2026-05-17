@@ -37,11 +37,13 @@ struct Desktop {
     ctx: egui::Context,
     editor: Option<Editor>,
     renderer: EguiSoftwareRender,
+    scene: crate::rasterizer::SceneCache,
     pending_textures: egui::TexturesDelta,
     pixels: Vec<u32>,
     pixel_size: (u32, u32),
     deadline: Option<Instant>,
     needs_ui: bool,
+    force_present: bool,
     occluded: bool,
     close_requested: bool,
     error: Option<String>,
@@ -71,6 +73,7 @@ impl Desktop {
         let Some(native) = &mut self.native else {
             return Ok(());
         };
+        let mut present = self.force_present || !self.needs_ui;
         if self.needs_ui || self.close_requested {
             let layout_started = Instant::now();
             let info = native
@@ -149,29 +152,41 @@ impl Desktop {
             if visible {
                 let raster_started = Instant::now();
                 let size = native.window.inner_size();
-                self.pixel_size = (size.width, size.height);
-                self.pixels
-                    .resize(size.width as usize * size.height as usize, 0);
-                let primitives = self.ctx.tessellate(output.shapes, output.pixels_per_point);
-                let mut buffer = BufferMutRef::new(
-                    bytemuck::cast_slice_mut(&mut self.pixels),
-                    size.width as usize,
-                    size.height as usize,
-                );
-                self.renderer.render(
-                    &mut buffer,
-                    &primitives,
-                    &std::mem::take(&mut self.pending_textures),
+                let changed = self.scene.changed(
+                    &output.shapes,
+                    (size.width, size.height),
                     output.pixels_per_point,
+                    !self.pending_textures.is_empty(),
                 );
-                self.counters.raster += 1;
-                self.counters.raster_ms += raster_started.elapsed().as_secs_f64() * 1000.0;
+                if !changed && !present {
+                    return Ok(());
+                }
+                if changed {
+                    present = true;
+                    self.pixel_size = (size.width, size.height);
+                    self.pixels
+                        .resize(size.width as usize * size.height as usize, 0);
+                    let primitives = self.ctx.tessellate(output.shapes, output.pixels_per_point);
+                    let mut buffer = BufferMutRef::new(
+                        bytemuck::cast_slice_mut(&mut self.pixels),
+                        size.width as usize,
+                        size.height as usize,
+                    );
+                    self.renderer.render(
+                        &mut buffer,
+                        &primitives,
+                        &std::mem::take(&mut self.pending_textures),
+                        output.pixels_per_point,
+                    );
+                    self.counters.raster += 1;
+                    self.counters.raster_ms += raster_started.elapsed().as_secs_f64() * 1000.0;
+                }
             } else {
                 // Retain texture uploads until a visible frame can consume them.
                 self.needs_ui = true;
             }
         }
-        if visible && !self.pixels.is_empty() {
+        if visible && present && !self.pixels.is_empty() {
             let present_started = Instant::now();
             let (width, height) = self.pixel_size;
             native.surface.resize(
@@ -181,6 +196,7 @@ impl Desktop {
             let mut buffer = native.surface.buffer_mut()?;
             buffer.copy_from_slice(&self.pixels);
             buffer.present()?;
+            self.force_present = false;
             self.counters.present += 1;
             self.counters.present_ms += present_started.elapsed().as_secs_f64() * 1000.0;
         }
@@ -275,6 +291,14 @@ impl ApplicationHandler<Wake> for Desktop {
                     _ => 9,
                 };
                 self.counters.causes[cause] += 1;
+                if matches!(
+                    event,
+                    WindowEvent::Resized(_)
+                        | WindowEvent::ScaleFactorChanged { .. }
+                        | WindowEvent::Occluded(false)
+                ) {
+                    self.force_present = true;
+                }
                 if let WindowEvent::Occluded(occluded) = &event {
                     self.occluded = *occluded;
                 }
@@ -375,11 +399,13 @@ fn run_internal(diagnostic: Option<std::path::PathBuf>) -> Result<(), Box<dyn Er
         ctx,
         editor: None,
         renderer: crate::rasterizer::create(),
+        scene: Default::default(),
         pending_textures: Default::default(),
         pixels: Vec::new(),
         pixel_size: (0, 0),
         deadline: None,
         needs_ui: true,
+        force_present: true,
         occluded: false,
         close_requested: false,
         error: None,

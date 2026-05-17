@@ -1,5 +1,29 @@
 use egui_software_backend::{ColorFieldOrder, EguiSoftwareRender};
 
+#[derive(Default)]
+pub struct SceneCache {
+    shapes: Vec<egui::epaint::ClippedShape>,
+    size: (u32, u32),
+    scale: f32,
+}
+impl SceneCache {
+    pub fn changed(
+        &mut self,
+        shapes: &[egui::epaint::ClippedShape],
+        size: (u32, u32),
+        scale: f32,
+        textures_changed: bool,
+    ) -> bool {
+        if !textures_changed && self.size == size && self.scale == scale && self.shapes == shapes {
+            return false;
+        }
+        self.shapes = shapes.to_vec();
+        self.size = size;
+        self.scale = scale;
+        true
+    }
+}
+
 pub fn create() -> EguiSoftwareRender {
     // The upstream rectangle fast path can overrun a photo texture at near-1:1
     // fractional scaling. Keep caching/raster optimizations, but use the safe

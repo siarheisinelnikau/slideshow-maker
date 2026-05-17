@@ -415,6 +415,7 @@ impl Editor {
             .default_pos([310.0, 140.0])
             .collapsible(false)
             .show(ctx, |ui| {
+                ui.set_min_width(420.0);
                 ui.heading("Ready to share");
                 note(
                     ui,

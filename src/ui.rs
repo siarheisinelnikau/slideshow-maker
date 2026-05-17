@@ -587,4 +587,50 @@ mod tests {
             "Closing without installing must discard the staged download"
         );
     }
+    #[test]
+    fn pointer_motion_over_empty_canvas_does_not_require_repainting() {
+        let ctx = egui::Context::default();
+        // Use the same context for UI/font state and the fixture editor.
+        let mut app = Editor::with_context(
+            ctx.clone(),
+            Settings {
+                startup_updates: false,
+                ffmpeg: None,
+            },
+        );
+        let mut scene = crate::rasterizer::SceneCache::default();
+        for frame in 0..4 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1180.0, 780.0),
+                )),
+                time: Some(frame as f64 * 0.25),
+                ..Default::default()
+            };
+            let output = ctx.run(input, |ctx| app.update(ctx));
+            scene.changed(
+                &output.shapes,
+                (1180, 780),
+                output.pixels_per_point,
+                !output.textures_delta.is_empty(),
+            );
+        }
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1180.0, 780.0),
+            )),
+            time: Some(1.25),
+            events: vec![egui::Event::PointerMoved(egui::pos2(100.0, 150.0))],
+            ..Default::default()
+        };
+        let output = ctx.run(input, |ctx| app.update(ctx));
+        assert!(!scene.changed(
+            &output.shapes,
+            (1180, 780),
+            output.pixels_per_point,
+            !output.textures_delta.is_empty()
+        ));
+    }
 }
