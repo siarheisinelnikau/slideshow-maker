@@ -1,69 +1,84 @@
-# Validation record and manual checklist
+# Validation record
 
-This session is restricted to code, compilation and bounded headless tests on generated data. No application windows, native dialogs, real photo folders, audio devices, GUI screenshots, updater installation, or FFmpeg processes were opened. All Cargo invocations use at most two jobs and repository-local target output.
+## Current Windows build — 2026-10-31
 
-## Automated checks
-
-Results from this session (2026-10-31):
+The initial implementation was code-only. The follow-up first attempted computer use, which the user stopped with Escape. Under the latest instruction **no computer use was invoked**: static design review uses bounded application-generated PNGs, while a separate native diagnostic exercises only its own window lifecycle. All data is synthetic. No audio was played, updates installed, user media opened, system settings changed, or remote Git operations performed.
 
 | Check | Result |
 | --- | --- |
-| Offline dependency resolution and Cargo lockfile | Passed |
-| `cargo check --offline --all-targets` | Passed |
 | Formatting | Passed |
 | Clippy on all targets with `-D warnings` | Passed |
-| Rust tests on all targets | 9 passed, 0 failed |
-| Synthetic 2.5-second video export | Passed; generated 30 MJPEG frames plus PCM16 soundtrack |
-| Independent OpenCV/FFmpeg decoding | All 30 frames decoded at 640×360, 12 fps; RIFF lengths and 40,000 PCM bytes validated |
-| Documentation relative links | Passed; no missing local targets |
-| PowerShell package/helper syntax parsing | Passed without executing either script |
-| `powershell -NoProfile -NonInteractive -File scripts/package.ps1` | Blocked by `AuthorizationManager check failed`; execution policy was not modified |
-| Direct Windows x64 release build with static MSVC runtime | Passed; optimized build completed in 7m 03s |
-| Packaged asset PE/checksum inspection | Passed; Windows x64 GUI executable, matching SHA-256, no imported MSVC redistributable DLL |
-| GitHub CI workflow | Prepared locally; not run remotely |
-| GUI, playback, FFmpeg executable, update network/install | Deferred by session restrictions or unavailable engine |
+| Rust tests | 14 passed: 9 core, 5 desktop/UI/raster regressions |
+| Optimized Windows x64 build with static MSVC runtime | Passed |
+| Executable/asset verification | Passed: x64 GUI PE, matching SHA-256, no imported OpenGL/Direct3D/DXGI or MSVC redistributable DLL |
+| Real editor, Settings and export client-area captures | Passed at 1180×780, 100% scale |
+| Empty editor capture at minimum logical size | Passed at 900×640, 125% scale (1125×800 PNG) |
+| Capture process lifecycle | All four children rendered three settled frames and exited successfully, under an external 15-second limit |
+| Native visible-idle / hidden / restored-idle gate | Passed; separate five-second clean samples, then automatic process exit |
+| Normal interactive input, native file dialogs and subjective responsiveness | Not verified; computer use is currently excluded |
+| MP4 engine, update installation/rollback, other-machine/DPI checks | Pending |
 
-The first two storage/export tests failed when using the system temporary directory: this managed environment denied temporary-file rename there (`Access is denied`, OS error 5). Fixtures were moved to a temporary subdirectory of this repository's ignored `.test-output`; all tests then passed. The environment also emitted an incremental-cache hard-link warning and used copies; it did not prevent builds or tests.
+The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 8,570,880 bytes. Its SHA-256 is:
 
-Reproduce with:
+```text
+36e13de899aca79197a36d8302dc79044fdbeb98a8f639829e11b79811971fb2
+```
+
+`dist` contains its checksum and license notices and is ignored by Git. Sources, lockfile, scripts, screenshots and the raw current runtime report are committed. No release was published.
+
+## Rendering/load evidence
+
+Verified process: PID 4968, `E:\work\github\slideshow-maker\dist\SlideshowMaker-v0.1.0.exe`, optimized Windows x64 build. The pipeline is egui CPU rasterization → softbuffer Win32 GDI bitmap presentation. Pinned native source uses `CreateDIBSection` and `BitBlt`; the target executable has no graphics-device API imports. This does not disable Windows desktop composition.
+
+The native diagnostic uses an isolated empty editor with no network or settings writes. It lets startup settle for two seconds, samples visible idle for five seconds, hides the test window for five seconds, restores it, lets it settle for two seconds, samples restored idle for five seconds, writes JSON and exits. An external supervisor applies a 26-second timeout to only that disposable child. No pointer/key injection or desktop capture occurs.
+
+| State | Sample | UI layouts | Rasterizations | Present calls | CPU, one core | CPU, machine |
+| --- | --- | --- | --- | --- | --- | --- |
+| visible_idle | 5.001s | 0 | 0 | 0 | 0.00% | 0.00% |
+| hidden | 5.000s | 0 | 0 | 0 | 0.00% | 0.00% |
+| restored_idle | 5.000s | 0 | 0 | 0 | 0.00% | 0.00% |
+
+The completed run made 4 total UI layouts, 2 rasterizations and 3 presentations across startup and restore; **none occurred in the three settled samples**. Restore did present a valid retained bitmap. CPU values are at `GetProcessTimes` counter resolution and do not claim mathematically zero activity. GPU telemetry and perceptual input latency are unavailable; no claim of fully verified responsiveness or absence of all compositor/driver stalls is made. See [raw runtime evidence](validation/runtime-gate.json).
+
+Earlier runs received real cursor events (including one with 640 movements in five seconds). They were rejected as idle samples rather than treated as passes. This motivated scene comparison: hit-testing still runs on useful input, but unchanged shapes, textures, viewport and scale skip tessellation, rasterization and presentation. Native expose/restore can still blit the retained bitmap when required. No artificial sleep, priority change or FPS cap was introduced.
+
+## Static visual review
+
+The distributable supports a developer-only offscreen capture path, parsed before ordinary startup. It uses the same UI construction, fonts, design tokens, compositor preview and CPU rasterizer, with no native window, network request, normal settings read/write or audio playback. The image is the application's real **client area**, not a mockup, desktop screenshot, title bar or native dialog. Each capture has an internal eight-frame/eight-second limit and an external 15-second limit.
+
+Reviewed PNGs: [editor](screenshots/editor.png), [Settings](screenshots/settings.png), [export](screenshots/export.png), [compact empty state at 125%](screenshots/empty-compact.png). The adjacent `.png.json` files record dimensions, scale, frame count and elapsed time. All four images were decoded and visually inspected with a local image viewer.
+
+Corrections found through these captures: timeline cards inheriting horizontal flow, unsupported arrow glyphs, double-applied scale at 125%, empty-state cursor advancement, export-dialog clipping, and an upstream rectangle rasterizer texture overrun at fractional photo scales. The shared renderer now uses the safe triangle path while keeping caching/other optimizations. A regression verifies the scaled image center and last edge pixel.
+
+The UI now separates Slide, Story and Music work, puts export choices in one deliberate dialog, keeps New/Open/Save-as in Project, and uses a coherent slate/mint palette, readable type sizes and spacing. This is an editing workspace; a tray-only interface would not serve its central task.
+
+## Reproduction
 
 ```powershell
 cargo fmt --all -- --check
-cargo check --offline --locked --all-targets
 cargo test --offline --locked --all-targets
 cargo clippy --offline --locked --all-targets -- -D warnings
-cargo run --offline --locked --example render_fixture
-python scripts/verify-fixture.py .test-output/synthetic.avi
-powershell -NoProfile -File scripts/package.ps1
+cargo --config 'target.x86_64-pc-windows-msvc.rustflags=["-C","target-feature=+crt-static"]' build --offline --locked --release --target x86_64-pc-windows-msvc --jobs 2 --target-dir target
+python scripts/create-gui-fixtures.py
+python scripts/capture-review.py dist/SlideshowMaker-v0.1.0.exe
+python scripts/verify-runtime.py dist/SlideshowMaker-v0.1.0.exe
 python scripts/verify-release.py dist/SlideshowMaker-v0.1.0.exe
 ```
 
-The direct release-build command used after the blocked script invocation is:
+Fixture creation/capture validation uses an already installed Pillow; it never installs dependencies. The runtime supervisor uses only Python's standard library. All Cargo builds use at most two jobs and a repository-local target directory.
 
-```powershell
-cargo --config 'target.x86_64-pc-windows-msvc.rustflags=["-C","target-feature=+crt-static"]' build --offline --locked --release --target x86_64-pc-windows-msvc --jobs 2 --target-dir target
-```
+## Earlier headless export evidence
 
-Packaging used direct repository-local file copies and `Get-FileHash` after the blocked script invocation; no execution-policy setting was changed. The application executable was not launched. The final local asset is `dist/SlideshowMaker-v0.1.0.exe`, 10,868,736 bytes. Its SHA-256 is:
+The built-in exporter produced a 2.5-second 640×360, 12 fps AVI using two generated images, a title, transitions and a generated PCM16 tone. Independent OpenCV/FFmpeg decoding read all 30 MJPEG frames; a separate RIFF parser validated container lengths and 40,000 PCM audio bytes, without playback. Reproduce with `cargo run --locked --example render_fixture` and `python scripts/verify-fixture.py .test-output/synthetic.avi`. Repeated fixture runs preserve existing AVI files.
 
-```text
-830a5abe6a336c9364fee6407c5d346071412256754d777b38d3e3f00e8719f3
-```
+The initial system-temp storage/export tests hit an OS error 5 rename restriction. Moving fixtures into ignored `.test-output` resolved it. Incremental-cache hard-link warnings caused Cargo to copy files; checks still passed. PowerShell policy blocked direct execution of `scripts/package.ps1`; its syntax was parsed without execution, and packaging was performed by direct Cargo build/file copy/checksum commands without changing policy. GitHub CI is prepared but has not run remotely.
 
-The `.exe.sha256`, MIT license, font notices, and dependency declaration inventory are beside it in `dist`. Build/output directories are intentionally ignored by Git; source, lockfile, scripts, and this validation record are committed. No repository, PR or release was published.
+## Remaining interactive/release checks
 
-The Rust tests exercise timing/rescaling, validation, Fit/Fill compositing and transitions, project round trips, AVI RIFF/index structure, per-frame audio sample counts, decodable JPEG frames, cancellation/no-clobber, semantic release handling, and checksum corruption. The fixture builds a 2.5-second 640×360, 12 fps slideshow with two generated photos, a title, transitions and a generated PCM16 tone. The Python verifier uses an independent installed OpenCV/FFmpeg decoder to decode every frame and separately parses the PCM chunks without playing them.
-
-## Deferred manual checks
-
-- Launch the packaged EXE on supported Windows x64 machines, including a clean machine, and verify OpenGL availability, scaling at 100/150/200% DPI, smaller windows, text and control layout.
-- Add representative JPEGs with EXIF rotation, PNG alpha, WebP and BMP. Compare preview and exported orientation, Fit edges, deliberate Fill crop, rotations, colors and captions. Replace/move a source and test relinking/error recovery.
-- Import, select, reorder and delete slides. Adjust total and individual durations. Exercise silent playback, seeking during a render, last-frame behavior and all transitions in portrait/landscape/square.
-- Save/reopen/save-as projects, including Unicode and long Windows paths, missing/readonly media, invalid JSON, unsupported versions and unsaved-close warnings. Keep independent copies of valuable media.
-- Export AVI to target players and inspect video/audio duration, timing, volume, loop boundaries and fades. Cancel during rendering, FFmpeg conversion and finalization. Verify failed output is absent and existing files remain byte-identical.
-- Select a trusted compatible FFmpeg executable, export MP4, and verify MPEG-4/AAC decoding in intended sharing destinations. Test missing binary, bad binary, absent encoder, low disk space, write denial and the 2 GB intermediate limit.
-- Measure visible idle CPU, playback responsiveness and background export with release builds on representative hardware; no CPU/latency claim is made from compilation alone.
-- Check Settings startup-update persistence: enabled starts a nonblocking public check; disabled makes zero startup requests; manual checking remains available. Test unpublished repository/404, offline, timeout, API rate limit, older/equal/prerelease/incompatible assets.
-- On a disposable portable installation only, test checksum failure, truncated/wrong-architecture update, unwritable executable folder, explicit download progress, dirty-project restart prevention, successful restart replacement, and file-operation rollback. Confirm projects/settings/source hashes are preserved and no helper remains. Check `.update-error.txt` on a failed helper operation.
-- Capture real main-window and Settings screenshots and add them to README with valid relative links and English captions.
-- Audit target-specific transitive licenses and font notices, test the final asset and checksum, and review the release draft before any separately authorized publication.
+- Exercise native import/open/save dialogs, caption entry, keyboard navigation, selection/reordering/deletion, seeking/playback and unsaved-close prompts after authorization and a clean rendering gate. Verify subjective responsiveness with the user; static PNGs and idle samples do not establish it.
+- Check target-machine DPI changes, maximize/minimize/restore and clean-machine behavior. The current bounded native check covers hide/show and retained-frame restoration, not every window-manager case.
+- Test representative EXIF orientations, transparency, long/Unicode paths, moved or read-only media and recovery in the native UI.
+- Open AVI in intended players and verify audible music timing, fades and loop boundaries. Cancel during full UI exports and low-disk/write-denial failures. Core no-clobber/cancellation and file-format behavior are covered by tests.
+- Supply a trusted compatible FFmpeg engine and verify real MP4 output and expected encoder errors. No engine was installed or invoked here.
+- Verify persistent startup-update opt-out, manual API failures and rate limits, and signed/checksummed official release assets. On a disposable installation, exercise explicit download, restart replacement and rollback; preserve source hashes and settings.
+- Audit final-target transitive notices and review the initial release draft before any separately authorized publication.

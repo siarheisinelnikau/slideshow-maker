@@ -1,0 +1,19 @@
+{
+  "client_area_only": true,
+  "elapsed_ms": 158,
+  "frames": 3,
+  "logical_size": [
+    1180,
+    780
+  ],
+  "network_requests": 0,
+  "physical_size": [
+    1180,
+    780
+  ],
+  "renderer": "production egui CPU rasterizer; no native window or GDI presentation in capture mode",
+  "scale": 1.0,
+  "screen": "settings",
+  "settings_writes": 0,
+  "version": "0.1.0"
+}
