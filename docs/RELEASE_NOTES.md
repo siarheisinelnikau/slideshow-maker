@@ -12,6 +12,15 @@ Local preparation only. There is no preceding published release and no release w
 - Scrub and play a silent preview, save/reopen editable projects, and relink moved photos.
 - Export MJPEG/PCM AVI directly, with progress, cancellation and protection against overwriting existing videos. Optional MP4 export uses a user-selected compatible FFmpeg executable.
 - Access the installed version, manual release checks, startup-check opt-out, and checksum-verified portable update download/restart in Settings.
+- Use a clearer workspace with Slide, Story and Music controls, a separate export dialog, consistent typography and a single mint accent.
+- Run a CPU/GDI Windows interface that waits for input and stops layout, rasterization and presentation in the measured idle and hidden states.
+
+## Fixed during local verification
+
+- Prevent a software-renderer texture overrun when a photo is displayed at a fractional scale.
+- Preserve the staged executable during an explicit update restart and discard it during ordinary closing.
+- Reset the selected slide in a new project and move the playhead with reordered slides.
+- Correct 125% capture scaling, timeline card flow and export-dialog clipping found in real application-generated PNGs.
 
 ## Platform and requirements
 
@@ -19,4 +28,4 @@ Planned asset: `SlideshowMaker-v0.1.0.exe` (Windows x64), accompanied by `Slides
 
 ## Known limitations and release gate
 
-Interactive Windows checks, real application/Settings screenshots, independent target-player compatibility, FFmpeg conversion, and update installation/rollback are pending. These must be completed before describing the app as release validated. Preview is silent; video-clip import, MP3, HEIC, undo/redo and media bundling are not implemented. AVI and MP4's intermediate AVI are limited to 2 GB. No signing certificate or installer is included.
+Application-generated editor/Settings/export PNGs and bounded idle/hidden/restore measurements are complete. Interactive Windows workflows, subjective responsiveness, additional target-player compatibility, FFmpeg conversion, and update installation/rollback remain pending. Preview is silent; video-clip import, MP3, HEIC, undo/redo and media bundling are not implemented. AVI and MP4's intermediate AVI are limited to 2 GB. No signing certificate or installer is included.

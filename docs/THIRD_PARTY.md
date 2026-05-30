@@ -6,7 +6,9 @@ Direct crates (exact transitive resolution is in `Cargo.lock`):
 
 | Component | Purpose | Declared license |
 | --- | --- | --- |
-| eframe / egui / epaint_default_fonts | Native desktop interface and embedded fonts | MIT OR Apache-2.0 (font files have separate licenses) |
+| egui / egui-winit / epaint_default_fonts | Desktop interface, platform integration and embedded fonts | MIT OR Apache-2.0 (font files have separate licenses) |
+| egui_software_backend / softbuffer | CPU rasterization and GDI presentation | MIT OR Apache-2.0 |
+| winit / windows-sys / bytemuck | Native event loop, timing counters and pixel buffers | Apache-2.0 / MIT OR Apache-2.0 / Zlib OR Apache-2.0 OR MIT |
 | ab_glyph | Caption glyph rasterization | Apache-2.0 |
 | image | JPEG, PNG, WebP and BMP decoding; JPEG encoding | MIT OR Apache-2.0 |
 | rfd | Native file dialogs | MIT |
@@ -18,7 +20,7 @@ Direct crates (exact transitive resolution is in `Cargo.lock`):
 
 Font notices are retained in `docs/licenses`: Ubuntu Light (Ubuntu Font Licence), Hack Regular (its bundled notices), Noto Emoji (SIL Open Font License), and the egui/emoji icon font (MIT). Ubuntu Light is embedded in exported caption rendering; egui also embeds its default font set. Do not remove the fonts' notices when redistributing.
 
-The [resolved dependency inventory](DEPENDENCY_LICENSES.md) records Cargo license declarations, including non-Windows and build dependencies. Regenerate it with `python scripts/license-inventory.py`. Before public distribution, audit the inventory for the final target and distribute any additional required notices. This is not a claim of a completed transitive legal audit. Full crate license texts can be inspected in the registry source packages.
+The [resolved dependency inventory](DEPENDENCY_LICENSES.md) records Cargo license declarations filtered for Windows x64, including build dependencies. Regenerate it with `python scripts/license-inventory.py`. Before public distribution, audit the inventory for the final target and distribute any additional required notices. This is not a claim of a completed transitive legal audit. Full crate license texts can be inspected in the registry source packages.
 
 ## Optional FFmpeg
 

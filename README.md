@@ -2,16 +2,16 @@
 
 A small Windows photo-story editor for turning family photographs, captions and music into a video. Original implementation and templates, with no affiliation to SmartSHOW. Local processing; no accounts, AI services, bundled music, or automatic media uploads.
 
-**Status:** first local implementation, version 0.1.0. Windows x64 is the initial packaging target. Interactive Windows validation is pending. The planned [GitHub repository](https://github.com/siarheisinelnikau/slideshow-maker) and releases have not been published by this work.
+**Status:** first local implementation, version 0.1.0. Windows x64 is the initial packaging target. The interface uses CPU rasterization and Windows GDI. The planned [GitHub repository](https://github.com/siarheisinelnikau/slideshow-maker) and releases have not been published by this work.
 
 ## Create a video
 
 1. Choose **Add photos** for JPEG, PNG, WebP or BMP images, or **Add title** for a title card.
-2. Select a timeline card. Edit its caption, duration, rotation and **Fit** / **Fill**. Fit preserves the entire image; Fill deliberately crops from the center. JPEG orientation metadata is applied before your rotation.
-3. Use the arrows to reorder slides. Choose landscape, portrait or square, one of three original color templates, and cuts, dissolves or fades through the background. Total duration proportionally rescales slide durations; transitions do not subtract from the total.
-4. Optionally choose a **PCM 16-bit WAV** soundtrack (mono/stereo, 8–96 kHz, up to 128 MiB), adjust volume and enable repeat. Short tracks otherwise end in silence. The export applies a half-second fade at each end.
-5. Scrub or play the **silent** timeline preview. Save an editable `.slideshow.json` project. Project files reference the original media; keep those files available or use **Relink photo** after moving them.
-6. Export **AVI** directly, or select your trusted FFmpeg executable in **Settings** to export **MP4**. Choose a new destination filename. Export runs in the background with progress and cancellation.
+2. Select a timeline card. In **Slide**, edit its caption, duration, rotation and framing. **Fit whole photo** preserves every edge; **Fill frame** deliberately crops from the center. JPEG orientation metadata is applied before your rotation.
+3. Use **Left / Right** on the cards to reorder slides. In **Story**, choose landscape, portrait or square, a color template and a transition. You can proportionally fit the story to a total duration; transitions do not subtract from the total.
+4. In **Music**, optionally choose a **PCM 16-bit WAV** soundtrack (mono/stereo, 8–96 kHz, up to 128 MiB), adjust volume and enable repeat. Short tracks otherwise fade into silence.
+5. Scrub or play the **silent** preview. Use **Save** for an editable `.slideshow.json` project; **Project** contains New, Open and Save as. Projects reference original media; keep those files available or use **Relink photo** after moving them.
+6. Choose **Export video** for video size, file type and frame rate. Export **AVI** directly, or select your trusted FFmpeg executable in **Settings** for **MP4**. Choose a new destination filename. Export runs in the background with progress and cancellation.
 
 Project files save atomically. Existing export files are never overwritten, including when cancellation or encoding fails. All media is read only. Save the project before closing or restarting to install an update.
 
@@ -45,7 +45,7 @@ cargo clippy --locked --all-targets -- -D warnings
 powershell -NoProfile -File scripts/package.ps1
 ```
 
-Packaging statically links the MSVC runtime and produces `dist/SlideshowMaker-v0.1.0.exe`, its `.sha256`, and license notices. It does not launch the application or publish anything. The app uses the standard Windows desktop graphics environment through eframe/OpenGL; actual driver/DPI and clean-machine compatibility still need manual validation. This session's PowerShell policy blocked running `.ps1` files; the release build was invoked directly through Cargo instead, without changing that policy. See the validation record for the exact commands and results.
+Packaging statically links the MSVC runtime and produces `dist/SlideshowMaker-v0.1.0.exe`, its `.sha256`, and license notices. It does not launch the application or publish anything. The Windows UI uses egui CPU rasterization and softbuffer's GDI bitmap presentation; it does not create an OpenGL or Direct3D device. The event loop waits for input, worker results or animation deadlines, and unchanged window exposures reuse the retained bitmap. Windows desktop composition remains an operating-system responsibility. Additional DPI and clean-machine compatibility checks are listed in the validation record. PowerShell policy blocked running `.ps1` files in the initial session; the release build was invoked directly through Cargo without changing that policy.
 
 For a safe, headless synthetic export (no UI, playback, or network):
 
@@ -58,14 +58,35 @@ The second command uses an **already installed** `opencv-python` decoder; it is 
 
 ## Settings and updates
 
-**Settings → About & updates** shows the installed version, **Check for updates**, and a persistent **Check for updates on startup** toggle (enabled by default). Disabling it makes no update request at the next launch. Settings are stored under `%APPDATA%/SlideshowMaker/settings.json`. Startup checks use a separate bounded worker and do not block editing. A nonexistent repository/release, rate limit or network failure is reported as an unavailable check, never as “up to date”; startup errors remain in Settings without a popup.
+**Settings** shows the installed version, **Check for updates**, and a persistent **Check for updates on startup** toggle (enabled by default). Disabling it makes no update request at the next launch. Settings are stored under `%APPDATA%/SlideshowMaker/settings.json`. Startup checks use a separate bounded worker and do not block editing. A nonexistent repository/release, rate limit or network failure is reported as an unavailable check, never as “up to date”; startup errors remain in Settings without a popup.
 
-A newer stable Windows x64 release needs `SlideshowMaker-vVERSION.exe` and `SlideshowMaker-vVERSION.exe.sha256` assets on the canonical repository. **Download and install** stages the official executable, checks its declared length, SHA-256 and x64 PE header, then offers **Restart to install verified update**. A hidden PowerShell helper waits for the app to exit, replaces the portable executable, restarts it, and rolls back file-operation/start failures. Project/media/settings paths are preserved. Read-only installations fail without elevation. The portable executable keeps its installed filename during updates. Checksum assets detect corrupt downloads; they are not a separate code-signing trust root.
+A newer stable Windows x64 release needs `SlideshowMaker-vVERSION.exe` and `SlideshowMaker-vVERSION.exe.sha256` assets on the canonical repository. **Download and install** stages the official executable, checks its declared length, SHA-256 and x64 PE header, then offers **Restart to install update**. A hidden PowerShell helper waits for the app to exit, replaces the portable executable, restarts it, and rolls back file-operation/start failures. Project/media/settings paths are preserved. Read-only installations fail without elevation. The portable executable keeps its installed filename during updates. Checksum assets detect corrupt downloads; they are not a separate code-signing trust root.
 
-The updater is implemented but **network and replacement behavior were not executed in this session**. A packaged Windows update/rollback test remains required before publication. See [manual checks](docs/VALIDATION.md).
+Update installation and rollback have not been exercised. Startup-check persistence and native interaction still require interactive verification before publication. See [manual checks](docs/VALIDATION.md).
 
 ## Screenshots
 
-Real application and Settings screenshots are pending. This session explicitly prohibited GUI launches and screen capture. No mock screenshot or broken image link is substituted. Capture and add accurate English-captioned screenshots after the authorized interactive validation.
+These are application-generated captures of the real client area, using the same egui components, fonts and CPU rasterizer as the Windows application. They show original synthetic postcard media, not user photographs. Native title bars, file dialogs and mouse/keyboard behavior are outside these captures.
+
+![SlideshowMaker editor with a photo preview, caption controls and a three-slide timeline](docs/screenshots/editor.png)
+
+![SlideshowMaker Settings showing the installed version, update preferences and optional MP4 engine](docs/screenshots/settings.png)
+
+Additional verified views: [export options](docs/screenshots/export.png) and [empty editor at 900×640 logical pixels, 125% scale](docs/screenshots/empty-compact.png).
+
+To reproduce the bounded captures with Python/Pillow already installed:
+
+```powershell
+python scripts/create-gui-fixtures.py
+python scripts/capture-review.py dist/SlideshowMaker-v0.1.0.exe
+```
+
+Each capture starts a separate isolated process, uses no network or normal settings, renders three settled frames, writes PNG/metadata and exits. Direct invocation is also available:
+
+```powershell
+./dist/SlideshowMaker-v0.1.0.exe --screenshot E:/work/github/slideshow-maker/.test-output/review.png --screen settings --size 1180x780 --scale 1
+```
+
+For a separate bounded native rendering check, run `python scripts/verify-runtime.py dist/SlideshowMaker-v0.1.0.exe`. It samples visible idle, hidden and restored idle states, then exits automatically; it does not use computer use or simulate input. The recorded clean five-second samples each had zero UI layouts, rasterizations and presentations, and 0.00% CPU of one core at system-counter resolution. This supports idle/hidden efficiency, not a claim that subjective input responsiveness or GPU/compositor behavior has been fully verified.
 
 See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and [initial release draft](docs/RELEASE_NOTES.md). Source code is MIT licensed; embedded fonts and dependencies retain their licenses.
