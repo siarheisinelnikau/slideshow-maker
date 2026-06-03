@@ -215,6 +215,7 @@ impl ApplicationHandler<Wake> for Desktop {
                 .with_inner_size([1180.0, 780.0])
                 .with_min_inner_size([900.0, 640.0]);
             let window = Arc::new(egui_winit::create_window(&self.ctx, event_loop, &builder)?);
+            crate::app_icon::apply(&window)?;
             let context = softbuffer::Context::new(window.clone())?;
             let surface = softbuffer::Surface::new(&context, window.clone())?;
             let input = egui_winit::State::new(
@@ -275,6 +276,11 @@ impl ApplicationHandler<Wake> for Desktop {
                 native.window.request_redraw();
             }
             event => {
+                if matches!(event, WindowEvent::ScaleFactorChanged { .. }) {
+                    crate::app_icon::apply(&native.window).unwrap_or_else(|error| {
+                        eprintln!("Could not update native icons for DPI: {error}")
+                    });
+                }
                 self.counters.input += 1;
                 let cause = match &event {
                     WindowEvent::CursorMoved { .. } => 0,
@@ -414,11 +420,11 @@ fn run_internal(diagnostic: Option<std::path::PathBuf>) -> Result<(), Box<dyn Er
     };
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop.run_app(&mut app)?;
-    if app.diagnostic.as_ref().is_some_and(|d| !d.completed()) {
-        return Err("Diagnostic ended before all phases completed".into());
-    }
     if let Some(error) = app.error {
         return Err(error.into());
+    }
+    if app.diagnostic.as_ref().is_some_and(|d| !d.completed()) {
+        return Err("Diagnostic ended before all phases completed".into());
     }
     Ok(())
 }

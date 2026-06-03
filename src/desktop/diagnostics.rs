@@ -138,8 +138,9 @@ impl Desktop {
                     native.window.is_visible() == Some(true),
                 );
                 let restored = self.counters.present > d.hidden_present;
-                let passed = d.passed && restored;
-                let report = serde_json::json!({"version":env!("CARGO_PKG_VERSION"),"executable":std::env::current_exe().ok(),"pid":std::process::id(),"backend":"egui CPU rasterization + softbuffer Win32 GDI","states":d.rows,"restore_presented":restored,"total_layout_frames":self.counters.layout,"total_raster_frames":self.counters.raster,"total_present_calls":self.counters.present,"gpu_telemetry":"unavailable; native pipeline and executable imports inspected separately","perceptual_responsiveness":"not tested without user interaction","passed":passed});
+                let icons = crate::app_icon::inspect(&native.window);
+                let passed = d.passed && restored && icons["present"] == true;
+                let report = serde_json::json!({"version":env!("CARGO_PKG_VERSION"),"executable":std::env::current_exe().ok(),"pid":std::process::id(),"backend":"egui CPU rasterization + softbuffer Win32 GDI","states":d.rows,"restore_presented":restored,"native_icons":icons,"total_layout_frames":self.counters.layout,"total_raster_frames":self.counters.raster,"total_present_calls":self.counters.present,"gpu_telemetry":"unavailable; native pipeline and executable imports inspected separately","perceptual_responsiveness":"not tested without user interaction","passed":passed});
                 if let Err(error) = slideshow_maker::storage::atomic_json(&d.path, &report) {
                     self.error = Some(error);
                 } else if !passed {

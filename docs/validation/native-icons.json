@@ -1,0 +1,19 @@
+{
+  "hidden_window": true,
+  "native_icons": {
+    "large": [
+      32,
+      32
+    ],
+    "present": true,
+    "scale": 1.0,
+    "small": [
+      16,
+      16
+    ]
+  },
+  "pid": 19936,
+  "ui_frames": 0,
+  "version": "0.1.0",
+  "binary_sha256": "86117459632099cc8eb3ab2b8604be5bb600e35608a4f625ac0dbd784781948d"
+}

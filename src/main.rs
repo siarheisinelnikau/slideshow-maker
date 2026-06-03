@@ -1,4 +1,5 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
+mod app_icon;
 mod capture;
 mod desktop;
 mod rasterizer;
@@ -6,6 +7,15 @@ mod ui;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if arguments
+        .first()
+        .is_some_and(|flag| flag == "--verify-native-icons")
+    {
+        if arguments.len() != 2 {
+            return Err("Use --verify-native-icons ABSOLUTE_JSON_PATH".into());
+        }
+        return app_icon::verify_native(arguments[1].clone().into());
+    }
     if arguments
         .first()
         .is_some_and(|flag| flag == "--diagnostic-report")

@@ -119,6 +119,7 @@ not a completed legal audit. Preserve upstream license texts and notices when re
 | windows-targets | 0.52.6 | MIT OR Apache-2.0 | [source](https://github.com/microsoft/windows-rs) |
 | windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 | [source](https://github.com/microsoft/windows-rs) |
 | winit | 0.30.13 | Apache-2.0 | [source](https://github.com/rust-windowing/winit) |
+| winresource | 0.1.34 | MIT | [source](https://github.com/BenjaminRi/winresource) |
 | zerocopy | 0.8.63 | BSD-2-Clause OR Apache-2.0 OR MIT | [source](https://github.com/google/zerocopy) |
 | zerocopy-derive | 0.8.63 | BSD-2-Clause OR Apache-2.0 OR MIT | [source](https://github.com/google/zerocopy) |
 | zeroize | 1.9.1 | Apache-2.0 OR MIT | [source](https://github.com/RustCrypto/utils) |
