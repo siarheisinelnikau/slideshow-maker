@@ -14,21 +14,25 @@ The initial implementation was code-only. The follow-up first attempted computer
 | Real editor, Settings and export client-area captures | Passed at 1180×780, 100% scale |
 | Empty editor capture at minimum logical size | Passed at 900×640, 125% scale (1125×800 PNG) |
 | Capture process lifecycle | All four children rendered three settled frames and exited successfully, under an external 15-second limit |
-| Native visible-idle / hidden / restored-idle gate | Passed; separate five-second clean samples, then automatic process exit |
+| Native visible-idle / hidden / restored-idle gate | Passed on the prior CPU/GDI build; baseline report preserved below |
+| Embedded icon resources | Passed; all eleven 32-bit 16–256 px images match the ICO source |
+| Native window/title-bar and taskbar icons | Passed in a hidden, render-free probe; 16×16 and 32×32 at 100% scale |
 | Normal interactive input, native file dialogs and subjective responsiveness | Not verified; computer use is currently excluded |
 | MP4 engine, update installation/rollback, other-machine/DPI checks | Pending |
 
-The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 8,570,880 bytes. Its SHA-256 is:
+The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 9,164,288 bytes. Its SHA-256 is:
 
 ```text
-36e13de899aca79197a36d8302dc79044fdbeb98a8f639829e11b79811971fb2
+86117459632099cc8eb3ab2b8604be5bb600e35608a4f625ac0dbd784781948d
 ```
 
 `dist` contains its checksum and license notices and is ignored by Git. Sources, lockfile, scripts, screenshots and the raw current runtime report are committed. No release was published.
 
-## Rendering/load evidence
+## Rendering/load baseline before the icon-resource repair
 
-Verified process: PID 4968, `E:\work\github\slideshow-maker\dist\SlideshowMaker-v0.1.0.exe`, optimized Windows x64 build. The pipeline is egui CPU rasterization → softbuffer Win32 GDI bitmap presentation. Pinned native source uses `CreateDIBSection` and `BitBlt`; the target executable has no graphics-device API imports. This does not disable Windows desktop composition.
+The following report identifies the earlier measured executable and its own hash. It is not a new runtime-performance measurement of the icon-bearing build. A follow-up full runtime diagnostic ended before every phase completed; no replacement performance pass is claimed. The narrowly scoped hidden native-icon probe below completed successfully.
+
+Verified baseline process: PID 4968, `E:\work\github\slideshow-maker\dist\SlideshowMaker-v0.1.0.exe`, optimized Windows x64 build. The pipeline is egui CPU rasterization → softbuffer Win32 GDI bitmap presentation. Pinned native source uses `CreateDIBSection` and `BitBlt`; the target executable has no graphics-device API imports. This does not disable Windows desktop composition.
 
 The native diagnostic uses an isolated empty editor with no network or settings writes. It lets startup settle for two seconds, samples visible idle for five seconds, hides the test window for five seconds, restores it, lets it settle for two seconds, samples restored idle for five seconds, writes JSON and exits. An external supervisor applies a 26-second timeout to only that disposable child. No pointer/key injection or desktop capture occurs.
 
@@ -41,6 +45,14 @@ The native diagnostic uses an isolated empty editor with no network or settings 
 The completed run made 4 total UI layouts, 2 rasterizations and 3 presentations across startup and restore; **none occurred in the three settled samples**. Restore did present a valid retained bitmap. CPU values are at `GetProcessTimes` counter resolution and do not claim mathematically zero activity. GPU telemetry and perceptual input latency are unavailable; no claim of fully verified responsiveness or absence of all compositor/driver stalls is made. See [raw runtime evidence](validation/runtime-gate.json).
 
 Earlier runs received real cursor events (including one with 640 movements in five seconds). They were rejected as idle samples rather than treated as passes. This motivated scene comparison: hit-testing still runs on useful input, but unchanged shapes, textures, viewport and scale skip tessellation, rasterization and presentation. Native expose/restore can still blit the retained bitmap when required. No artificial sleep, priority change or FPS cap was introduced.
+
+## Application icon repair
+
+The original executable had no primary icon group and the native window/taskbar had no explicit icon. The repair adds original SVG/PNG artwork, a standard transparent ICO with eleven 32-bit sizes (16, 20, 24, 32, 40, 48, 64, 96, 128, 192 and 256 px), Windows icon/version resources, and DPI-aware native small/large icon loading from the same embedded resource.
+
+`scripts/verify-release.py` parses the actual packaged PE resource tree and compares every RT_ICON payload with the source ICO. `scripts/verify-native-icons.py` starts the real executable in a separate hidden probe with a three-second internal/seven-second external limit. It reads the probe's own WM_GETICON handles, validates their bitmap dimensions and releases the inspection bitmaps; there are zero UI layouts/rasterizations/presentations and no computer use. The process exited successfully with a 16×16 title-bar icon and 32×32 taskbar icon at 100% scale. See [native icon evidence](validation/native-icons.json) for the matching executable hash and PID. Explorer/taskbar visual inspection and other actual desktop DPI settings were not exercised.
+
+The small artwork was visually reviewed on light and dark backgrounds in [the icon preview](../assets/icon-preview.png). Regenerate assets with `python scripts/generate-icon.py`; verify the packaged result with `python scripts/verify-native-icons.py dist/SlideshowMaker-v0.1.0.exe`. No Windows icon-cache or system setting was changed.
 
 ## Static visual review
 

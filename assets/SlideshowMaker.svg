@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>SlideshowMaker: photo cards and a play button</title>
+  <rect x="12" y="12" width="232" height="232" rx="48" fill="#0f161e"/>
+  <rect x="63" y="44" width="156" height="130" rx="18" fill="#357d70"/>
+  <rect x="33" y="64" width="167" height="141" rx="16" fill="#79e0bf"/>
+  <rect x="46" y="77" width="141" height="102" rx="8" fill="#254958"/>
+  <circle cx="150" cy="100" r="10" fill="#79e0bf"/>
+  <polygon points="46,163 85,120 119,153 146,130 187,171 187,179 46,179" fill="#79e0bf"/>
+  <circle cx="195" cy="195" r="44" fill="#0f161e"/>
+  <circle cx="195" cy="195" r="37" fill="#79e0bf"/>
+  <polygon points="183,175 211,195 183,215" fill="#0f161e"/>
+</svg>

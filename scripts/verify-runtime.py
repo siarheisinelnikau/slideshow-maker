@@ -1,6 +1,7 @@
 """Bounded native diagnostic; no computer use, simulated input, or user data."""
 import json
 import hashlib
+import math
 import subprocess
 import sys
 import time
@@ -30,4 +31,10 @@ print(f"Report: {report}")
 print(json.dumps(data, indent=2))
 if process.returncode or not data["passed"]:
     raise RuntimeError("Rendering gate did not pass; inspect the recorded samples")
+icons = data["native_icons"]
+assert icons["present"], "The native title-bar/taskbar icons are missing"
+for key, logical in [("small", 16), ("large", 32)]:
+    expected = math.floor(logical * icons["scale"] + 0.5)
+    assert icons[key] == [expected, expected], f"Unexpected {key} icon size: {icons}"
 print("PASS: bounded native CPU/GDI diagnostic completed and exited")
+print(f"PASS: native title-bar icon {icons['small']}, taskbar icon {icons['large']}")

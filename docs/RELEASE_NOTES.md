@@ -17,6 +17,8 @@ Local preparation only. There is no preceding published release and no release w
 
 ## Fixed during local verification
 
+- Embed a complete multi-size application icon in the EXE and assign matching title-bar/taskbar icons with DPI-aware resource selection.
+
 - Prevent a software-renderer texture overrun when a photo is displayed at a fractional scale.
 - Preserve the staged executable during an explicit update restart and discard it during ordinary closing.
 - Reset the selected slide in a new project and move the playhead with reordered slides.

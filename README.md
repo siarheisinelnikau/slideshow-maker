@@ -37,6 +37,8 @@ FFmpeg is **not bundled, installed, downloaded or executed during this developme
 
 Requires Rust 1.95 or newer and the Windows MSVC C++ build tools already installed. Dependencies are locked in `Cargo.lock`. The repository Cargo configuration limits jobs to two and uses a local `target` directory.
 
+The Windows SDK resource compiler embeds the application's original 16–256 px icon and version metadata. The title bar and taskbar load matching DPI-appropriate images from the EXE. Icon source assets are in `assets`; regenerate them with `python scripts/generate-icon.py` when Pillow is already installed.
+
 ```powershell
 cargo fmt --all -- --check
 cargo check --locked --all-targets
