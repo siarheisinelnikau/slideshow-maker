@@ -17,6 +17,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[derive(Clone, Copy)]
+struct PreviewToken {
+    revision: u64,
+    generation: u64,
+}
 enum Job {
     Import,
     Music,
@@ -25,7 +30,7 @@ enum Job {
     Open,
     Save(Project, Option<PathBuf>),
     Settings(Settings),
-    Preview(Project, f64, u64),
+    Preview(Project, f64, PreviewToken),
     Export(Project, Format, Option<PathBuf>, Progress),
 }
 enum Event {
@@ -36,7 +41,8 @@ enum Event {
     Opened(Project, PathBuf),
     Saved(PathBuf),
     SettingsSaved,
-    Preview(image::RgbImage, u64),
+    Preview(image::RgbImage, PreviewToken),
+    PreviewError(String, PreviewToken),
     Exported(PathBuf),
     Cancelled,
     Error(String),
@@ -45,6 +51,8 @@ struct Worker {
     tx: SyncSender<Job>,
     rx: Receiver<Event>,
     busy: bool,
+    previewing: bool,
+    pending: Option<(Job, String)>,
     label: String,
 }
 impl Worker {
@@ -54,6 +62,10 @@ impl Worker {
         std::thread::spawn(move || {
             let mut renderer = Renderer::default();
             while let Ok(job) = requests.recv() {
+                let preview_token = match &job {
+                    Job::Preview(_, _, token) => Some(*token),
+                    _ => None,
+                };
                 let result = (|| -> Result<Event> {
                     let images = || {
                         rfd::FileDialog::new()
@@ -133,7 +145,11 @@ impl Worker {
                         }
                     })
                 })();
-                if events.send(result.unwrap_or_else(Event::Error)).is_err() {
+                let event = result.unwrap_or_else(|error| match preview_token {
+                    Some(token) => Event::PreviewError(error, token),
+                    None => Event::Error(error),
+                });
+                if events.send(event).is_err() {
                     break;
                 }
                 ctx.request_repaint();
@@ -143,14 +159,41 @@ impl Worker {
             tx,
             rx,
             busy: false,
+            previewing: false,
+            pending: None,
             label: String::new(),
         }
     }
     fn send(&mut self, job: Job, label: &str) {
-        if !self.busy && self.tx.try_send(job).is_ok() {
+        let preview = matches!(&job, Job::Preview(..));
+        if self.busy {
+            // One explicit action may wait behind a preview. Frames themselves
+            // are never queued; the scheduler requests only the latest state.
+            if self.previewing && !preview && self.pending.is_none() {
+                self.pending = Some((job, label.into()));
+            }
+        } else if self.tx.try_send(job).is_ok() {
             self.busy = true;
+            self.previewing = preview;
             self.label = label.into();
         }
+    }
+    fn blocks_ui(&self) -> bool {
+        (self.busy && !self.previewing) || self.pending.is_some()
+    }
+    fn foreground_label(&self) -> &str {
+        self.pending
+            .as_ref()
+            .map_or(&self.label, |(_, label)| label)
+    }
+    fn complete(&mut self) -> bool {
+        let was_preview = self.previewing;
+        self.busy = false;
+        self.previewing = false;
+        if let Some((job, label)) = self.pending.take() {
+            self.send(job, &label);
+        }
+        was_preview
     }
 }
 enum NetEvent {
@@ -170,6 +213,7 @@ pub struct Editor {
     selected: usize,
     time: f64,
     revision: u64,
+    preview_generation: u64,
     preview_revision: u64,
     worker: Worker,
     texture: Option<egui::TextureHandle>,
@@ -213,6 +257,7 @@ impl Editor {
             selected: 0,
             time: 0.0,
             revision: 1,
+            preview_generation: 1,
             preview_revision: 0,
             worker: Worker::new(ctx.clone()),
             texture: None,
@@ -264,7 +309,14 @@ impl Editor {
         self.playing = false;
         self.dirty = true;
         self.revision += 1;
+        self.preview_generation += 1;
         self.total_input = self.project.duration();
+    }
+    fn preview_token(&self) -> PreviewToken {
+        PreviewToken {
+            revision: self.revision,
+            generation: self.preview_generation,
+        }
     }
     fn check_updates(&mut self, ctx: &egui::Context) {
         if self.net_busy {
@@ -318,6 +370,7 @@ impl Editor {
                 self.time = 0.0;
                 self.texture = None;
                 self.revision += 1;
+                self.preview_generation += 1;
                 self.total_input = 0.0;
             }
             Discard::Open => self.worker.send(Job::Open, "Opening project…"),
@@ -329,8 +382,8 @@ impl Editor {
     }
     fn receive(&mut self, ctx: &egui::Context) {
         if let Ok(event) = self.worker.rx.try_recv() {
-            self.worker.busy = false;
-            let was_export = self.progress.take().is_some();
+            let was_preview = self.worker.complete();
+            let was_export = !was_preview && self.progress.take().is_some();
             match event {
                 Event::Photos(paths) => {
                     let room = 500usize.saturating_sub(self.project.slides.len());
@@ -365,6 +418,7 @@ impl Editor {
                     self.time = 0.0;
                     self.total_input = self.project.duration();
                     self.revision += 1;
+                    self.preview_generation += 1;
                     self.message = "Project opened".into();
                 }
                 Event::Saved(path) => {
@@ -373,24 +427,37 @@ impl Editor {
                     self.message = "Project saved".into();
                 }
                 Event::SettingsSaved => {}
-                Event::Preview(img, rev) => {
-                    if rev == self.revision {
+                Event::Preview(img, token) => {
+                    // Playback can advance while decoding a frame. A ready
+                    // frame is still useful until an edit or seek stops play.
+                    if token.generation == self.preview_generation
+                        && (token.revision == self.revision || self.playing)
+                    {
                         let size = [img.width() as usize, img.height() as usize];
                         let color = egui::ColorImage::from_rgb(size, img.as_raw());
-                        if let Some(t) = &mut self.texture {
-                            t.set(color, egui::TextureOptions::LINEAR);
-                        } else {
-                            self.texture = Some(ctx.load_texture(
-                                "composite",
-                                color,
-                                egui::TextureOptions::LINEAR,
-                            ));
-                        }
-                        self.preview_revision = rev;
+                        // The software backend caches meshes by texture ID,
+                        // without invalidating them on pixel replacement.
+                        // A fresh handle invalidates the image primitive;
+                        // dropping the preceding handle frees its frame data.
+                        self.texture = Some(ctx.load_texture(
+                            "composite",
+                            color,
+                            egui::TextureOptions::LINEAR,
+                        ));
+                        self.preview_revision = token.revision;
                     }
                 }
                 Event::Exported(path) => {
                     self.message = format!("Video exported: {}", path.display())
+                }
+                Event::PreviewError(error, token) => {
+                    if token.generation == self.preview_generation
+                        && (token.revision == self.revision || self.playing)
+                    {
+                        self.message = error;
+                        self.playing = false;
+                        self.preview_revision = self.revision;
+                    }
                 }
                 Event::Cancelled => {}
                 Event::Error(e) => {
@@ -434,7 +501,7 @@ impl Editor {
         let ctx = ctx.clone();
         self.receive(&ctx);
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close {
-            if self.worker.busy || self.net_busy || self.save_settings {
+            if self.worker.blocks_ui() || self.net_busy || self.save_settings {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.message =
                     "Wait for the current operation or cancel the export before closing.".into();
@@ -443,7 +510,9 @@ impl Editor {
                 self.discard = Some(Discard::Close);
             }
         }
-        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::S)) && !self.worker.busy {
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::S))
+            && !self.worker.blocks_ui()
+        {
             self.playing = false;
             self.worker.send(
                 Job::Save(self.project.clone(), self.path.clone()),
@@ -488,8 +557,8 @@ impl Editor {
                     }
                 });
                 ctx.request_repaint_after(Duration::from_millis(150));
-            } else if self.worker.busy && !self.worker.label.starts_with("Rendering preview") {
-                ui.label(&self.worker.label);
+            } else if self.worker.blocks_ui() {
+                ui.label(self.worker.foreground_label());
             }
         });
         egui::TopBottomPanel::bottom("timeline")
@@ -525,7 +594,7 @@ impl Editor {
                 self.save_settings = false;
             } else if self.preview_revision != self.revision && !self.project.slides.is_empty() {
                 self.worker.send(
-                    Job::Preview(self.project.clone(), self.time, self.revision),
+                    Job::Preview(self.project.clone(), self.time, self.preview_token()),
                     "Rendering preview…",
                 );
             } else if self.project.slides.is_empty() {
@@ -557,6 +626,274 @@ mod tests {
                 ffmpeg: None,
             },
         )
+    }
+    fn controlled_worker() -> (Worker, Receiver<Job>, SyncSender<Event>) {
+        let (tx, requests) = mpsc::sync_channel(1);
+        let (responses, rx) = mpsc::sync_channel(1);
+        (
+            Worker {
+                tx,
+                rx,
+                busy: false,
+                previewing: false,
+                pending: None,
+                label: String::new(),
+            },
+            requests,
+            responses,
+        )
+    }
+    #[test]
+    fn explicit_action_waits_for_preview_and_is_dispatched_once() {
+        let (mut worker, requests, _responses) = controlled_worker();
+        worker.send(
+            Job::Preview(
+                Project::default(),
+                0.0,
+                PreviewToken {
+                    revision: 1,
+                    generation: 1,
+                },
+            ),
+            "Rendering preview…",
+        );
+        assert!(!worker.blocks_ui());
+        assert!(matches!(requests.recv().unwrap(), Job::Preview(..)));
+        worker.send(Job::Save(Project::default(), None), "Saving project…");
+        assert!(worker.blocks_ui());
+        assert_eq!(worker.foreground_label(), "Saving project…");
+        assert!(worker.complete());
+        assert!(matches!(requests.recv().unwrap(), Job::Save(..)));
+        assert!(worker.blocks_ui());
+        assert!(!worker.complete());
+        assert!(!worker.blocks_ui());
+        assert!(requests.try_recv().is_err());
+    }
+    #[test]
+    fn queued_export_keeps_progress_when_preview_completes() {
+        let ctx = egui::Context::default();
+        let mut app = editor();
+        let (worker, requests, responses) = controlled_worker();
+        app.worker = worker;
+        app.worker.send(
+            Job::Preview(app.project.clone(), 0.0, app.preview_token()),
+            "Rendering preview…",
+        );
+        assert!(matches!(requests.recv().unwrap(), Job::Preview(..)));
+        let progress = Progress::default();
+        app.progress = Some(progress.clone());
+        app.worker.send(
+            Job::Export(app.project.clone(), Format::Avi, None, progress.clone()),
+            "Exporting video…",
+        );
+        responses
+            .send(Event::Preview(
+                image::RgbImage::new(8, 8),
+                app.preview_token(),
+            ))
+            .unwrap();
+        app.receive(&ctx);
+        assert!(Arc::ptr_eq(
+            &app.progress.as_ref().unwrap().total,
+            &progress.total
+        ));
+        assert!(matches!(requests.recv().unwrap(), Job::Export(..)));
+        responses.send(Event::Cancelled).unwrap();
+        app.receive(&ctx);
+        assert!(app.progress.is_none());
+    }
+    #[test]
+    fn editing_or_seeking_rejects_an_old_preview_after_play_resumes() {
+        let ctx = egui::Context::default();
+        let mut app = Editor::for_capture(
+            ctx.clone(),
+            Project {
+                slides: vec![Slide::title()],
+                ..Project::default()
+            },
+            "editor",
+        )
+        .unwrap();
+        let (worker, requests, responses) = controlled_worker();
+        app.worker = worker;
+        let old = app.preview_token();
+        app.worker.send(
+            Job::Preview(app.project.clone(), 0.0, old),
+            "Rendering preview…",
+        );
+        requests.recv().unwrap();
+        let expected = app.texture.as_ref().unwrap().size();
+        app.change();
+        app.playing = true;
+        responses
+            .send(Event::Preview(image::RgbImage::new(8, 8), old))
+            .unwrap();
+        app.receive(&ctx);
+        assert_eq!(app.texture.as_ref().unwrap().size(), expected);
+        app.worker.send(
+            Job::Preview(app.project.clone(), 0.0, old),
+            "Rendering preview…",
+        );
+        requests.recv().unwrap();
+        responses
+            .send(Event::PreviewError(
+                "An obsolete request failed".into(),
+                old,
+            ))
+            .unwrap();
+        app.receive(&ctx);
+        assert!(
+            app.playing,
+            "A previous generation's error must not stop the new preview"
+        );
+        let current = app.preview_token();
+        app.worker.send(
+            Job::Preview(app.project.clone(), 0.0, current),
+            "Rendering preview…",
+        );
+        requests.recv().unwrap();
+        responses
+            .send(Event::Preview(image::RgbImage::new(16, 16), current))
+            .unwrap();
+        app.receive(&ctx);
+        assert_eq!(app.texture.as_ref().unwrap().size(), [16, 16]);
+        app.revision += 1;
+        app.worker.send(
+            Job::Preview(app.project.clone(), 0.0, current),
+            "Rendering preview…",
+        );
+        requests.recv().unwrap();
+        responses
+            .send(Event::Preview(image::RgbImage::new(32, 32), current))
+            .unwrap();
+        app.receive(&ctx);
+        assert_eq!(
+            app.texture.as_ref().unwrap().size(),
+            [32, 32],
+            "Keep a useful delayed frame from the same playback generation"
+        );
+        app.seek_selection();
+        app.playing = true;
+        app.worker.send(
+            Job::Preview(app.project.clone(), 0.0, current),
+            "Rendering preview…",
+        );
+        requests.recv().unwrap();
+        responses
+            .send(Event::Preview(image::RgbImage::new(8, 8), current))
+            .unwrap();
+        app.receive(&ctx);
+        assert_eq!(
+            app.texture.as_ref().unwrap().size(),
+            [32, 32],
+            "A seek invalidates an earlier playback generation"
+        );
+    }
+    #[test]
+    fn preview_rendering_keeps_surrounding_controls_visually_stable() {
+        use egui_software_backend::BufferMutRef;
+        let ctx = egui::Context::default();
+        let mut second = Slide::title();
+        second.caption = "Another favorite moment".into();
+        let project = Project {
+            slides: vec![Slide::title(), second],
+            ..Project::default()
+        };
+        let mut app = Editor::for_capture(ctx.clone(), project, "editor").unwrap();
+        let (requests, _request_receiver) = mpsc::sync_channel(1);
+        let (responses, response_receiver) = mpsc::sync_channel(1);
+        app.worker = Worker {
+            tx: requests,
+            rx: response_receiver,
+            busy: false,
+            previewing: false,
+            pending: None,
+            label: String::new(),
+        };
+        app.playing = true;
+        let mut renderer = crate::rasterizer::create();
+        let mut frame = 0;
+        let mut draw = |app: &mut Editor| {
+            app.last_tick = Instant::now();
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1180.0, 780.0),
+                )),
+                time: Some(frame as f64 * 0.25),
+                ..Default::default()
+            };
+            frame += 1;
+            let output = ctx.run(input, |ctx| app.update(ctx));
+            let mut pixels = vec![0u32; 1180 * 780];
+            let primitives = ctx.tessellate(output.shapes, output.pixels_per_point);
+            renderer.render(
+                &mut BufferMutRef::new(bytemuck::cast_slice_mut(&mut pixels), 1180, 780),
+                &primitives,
+                &output.textures_delta,
+                output.pixels_per_point,
+            );
+            pixels
+        };
+        for _ in 0..3 {
+            draw(&mut app);
+        }
+        let ready = draw(&mut app);
+        app.time = 3.1;
+        app.revision += 1;
+        app.worker.send(
+            Job::Preview(app.project.clone(), app.time, app.preview_token()),
+            "Rendering preview…",
+        );
+        let rendering = draw(&mut app);
+        let image = Renderer::default()
+            .frame(&app.project, app.time, app.project.layout.size(360))
+            .unwrap();
+        responses
+            .send(Event::Preview(image, app.preview_token()))
+            .unwrap();
+        let completed = draw(&mut app);
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".test-output/preview-flicker");
+        std::fs::create_dir_all(&root).unwrap();
+        for (name, pixels) in [
+            ("ready", &ready),
+            ("rendering", &rendering),
+            ("completed", &completed),
+        ] {
+            image::RgbImage::from_fn(1180, 780, |x, y| {
+                let p = pixels[y as usize * 1180 + x as usize];
+                image::Rgb([(p >> 16) as u8, (p >> 8) as u8, p as u8])
+            })
+            .save(root.join(format!("{name}.png")))
+            .unwrap();
+        }
+        let differences = |pixels: &[u32]| {
+            [(0, 0, 1180, 68), (880, 70, 1180, 570), (0, 600, 1180, 780)]
+                .into_iter()
+                .map(|(left, top, right, bottom)| {
+                    (top..bottom)
+                        .flat_map(|y| (left..right).map(move |x| y * 1180 + x))
+                        .filter(|&i| ready[i] != pixels[i])
+                        .count()
+                })
+                .sum::<usize>()
+        };
+        assert_eq!(
+            differences(&rendering),
+            0,
+            "Preview work must not dim or change the toolbar, inspector or timeline"
+        );
+        assert_eq!(
+            differences(&completed),
+            0,
+            "Finishing a preview must not flash surrounding controls"
+        );
+        assert!(
+            (131..477)
+                .flat_map(|y| (18..854).map(move |x| y * 1180 + x))
+                .any(|i| ready[i] != completed[i]),
+            "The video pixels themselves must change"
+        );
     }
     #[test]
     fn new_project_resets_selection_and_does_not_start_network() {

@@ -17,6 +17,9 @@ Local preparation only. There is no preceding published release and no release w
 
 ## Fixed during local verification
 
+- Keep buttons, caption fields and timeline controls visually stable while preview frames render.
+- Refresh changing preview textures correctly, preserve queued Save/Export actions, and ignore frames/errors from before a seek or edit.
+
 - Embed a complete multi-size application icon in the EXE and assign matching title-bar/taskbar icons with DPI-aware resource selection.
 
 - Prevent a software-renderer texture overrun when a photo is displayed at a fractional scale.

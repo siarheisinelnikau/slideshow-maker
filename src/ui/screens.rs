@@ -90,7 +90,7 @@ impl Editor {
                 note(ui, "A little movie. A lasting memory.");
             });
             ui.add_space(14.0);
-            ui.add_enabled_ui(!self.worker.busy, |ui| {
+            ui.add_enabled_ui(!self.worker.blocks_ui(), |ui| {
                 ui.menu_button("Project", |ui| {
                     if ui.button("New project").clicked() {
                         self.request_discard(Discard::New, ctx);
@@ -160,7 +160,7 @@ impl Editor {
         });
         ui.separator();
         let mut changed = false;
-        ui.add_enabled_ui(!self.worker.busy, |ui| {
+        ui.add_enabled_ui(!self.worker.blocks_ui(), |ui| {
             match self.inspector_tab {
                 InspectorTab::Slide => {
                     if let Some(slide) = self.project.slides.get_mut(self.selected) {
@@ -286,7 +286,7 @@ impl Editor {
                                         .truncate(),
                                     );
                                     ui.horizontal(|ui| {
-                                        ui.add_enabled_ui(!self.worker.busy, |ui| {
+                                        ui.add_enabled_ui(!self.worker.blocks_ui(), |ui| {
                                             if ui
                                                 .add_enabled(i > 0, Button::new("Left").small())
                                                 .on_hover_text("Move left")
@@ -333,6 +333,7 @@ impl Editor {
         }
     }
     pub(super) fn seek_selection(&mut self) {
+        self.preview_generation += 1;
         self.time = self
             .project
             .slides
@@ -361,14 +362,14 @@ impl Editor {
                 let ui=&mut content;
                     ui.label(RichText::new("Every photo has a story.").size(23.0).strong());
                     ui.label("Bring your favorite moments together with\ncaptions, gentle transitions and music.");ui.add_space(10.0);
-                    if ui.add_enabled(!self.worker.busy,primary("Add your photos…")).clicked(){self.worker.send(Job::Import,"Choosing photos…");}
+                    if ui.add_enabled(!self.worker.blocks_ui(),primary("Add your photos…")).clicked(){self.worker.send(Job::Import,"Choosing photos…");}
                     note(ui,"JPEG · PNG · WebP · BMP");
             }
             ui.add_space(10.0);
             ui.horizontal(|ui| {
-                if ui.add_enabled(!self.project.slides.is_empty() && self.progress.is_none(),Button::new(if self.playing{"Pause"}else{"Play preview"})).clicked(){self.playing = !self.playing;self.last_tick=Instant::now();}
+                if ui.add_enabled(!self.project.slides.is_empty() && self.progress.is_none(),Button::new(if self.playing{"Pause"}else{"Play preview"})).clicked(){self.playing = !self.playing;self.last_tick=Instant::now();self.preview_generation+=1;self.revision+=1;}
                 let duration=self.project.duration().max(0.001);self.time=self.time.clamp(0.0,duration);
-                if ui.add(egui::Slider::new(&mut self.time,0.0..=duration).show_value(false)).changed(){self.revision+=1;self.playing=false;}
+                if ui.add(egui::Slider::new(&mut self.time,0.0..=duration).show_value(false)).changed(){self.revision+=1;self.preview_generation+=1;self.playing=false;}
                 note(ui,&format!("{:.1} / {:.1}s",self.time,self.project.duration()));
             });
             note(ui,"Silent preview · soundtrack included in your export");
@@ -390,13 +391,13 @@ impl Editor {
             if self.update.is_some() && self.staged.is_none() && ui.add_enabled(!self.net_busy,primary("Download and install")).clicked(){self.download(ctx);}
             if self.net_busy && let Some(update)=&self.update {ui.add(egui::ProgressBar::new(self.downloaded.load(Ordering::Relaxed) as f32/update.size as f32).show_percentage());ctx.request_repaint_after(Duration::from_millis(250));}
             if let Some(staged)=&self.staged {
-                if ui.add_enabled(!self.dirty && !self.worker.busy && !self.save_settings,primary("Restart to install update")).clicked(){match updater::restart_install(staged){Ok(())=>{self.installing=true;self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}}
+                if ui.add_enabled(!self.dirty && !self.worker.blocks_ui() && !self.save_settings,primary("Restart to install update")).clicked(){match updater::restart_install(staged){Ok(())=>{self.installing=true;self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}}
                 if self.dirty{note(ui,"Save your project before restarting.");}
             }
             ui.add_space(8.0);ui.separator();section(ui,"MP4 export");
             ui.label("Choose a trusted FFmpeg executable to create MP4 videos. AVI export works without it.");
             if let Some(path)=&self.settings.ffmpeg{ui.add(egui::Label::new(path.display().to_string()).wrap());}else{note(ui,"No optional engine selected");}
-            if ui.add_enabled(!self.worker.busy,Button::new("Choose FFmpeg…")).clicked(){self.worker.send(Job::Ffmpeg,"Choosing FFmpeg…");}
+            if ui.add_enabled(!self.worker.blocks_ui(),Button::new("Choose FFmpeg…")).clicked(){self.worker.send(Job::Ffmpeg,"Choosing FFmpeg…");}
             ui.add_space(10.0);note(ui,"Your photos stay on this computer.");
         });
         self.show_settings = open;
@@ -425,7 +426,7 @@ impl Editor {
                         self.project.duration()
                     ),
                 );
-                ui.add_enabled_ui(!self.worker.busy, |ui| {
+                ui.add_enabled_ui(!self.worker.blocks_ui(), |ui| {
                     section(ui, "Video size");
                     ui.horizontal(|ui| {
                         for (h, label) in

@@ -8,7 +8,7 @@ The initial implementation was code-only. The follow-up first attempted computer
 | --- | --- |
 | Formatting | Passed |
 | Clippy on all targets with `-D warnings` | Passed |
-| Rust tests | 14 passed: 9 core, 5 desktop/UI/raster regressions |
+| Rust tests | 18 passed: 9 core, 9 desktop/UI/raster regressions |
 | Optimized Windows x64 build with static MSVC runtime | Passed |
 | Executable/asset verification | Passed: x64 GUI PE, matching SHA-256, no imported OpenGL/Direct3D/DXGI or MSVC redistributable DLL |
 | Real editor, Settings and export client-area captures | Passed at 1180×780, 100% scale |
@@ -20,10 +20,10 @@ The initial implementation was code-only. The follow-up first attempted computer
 | Normal interactive input, native file dialogs and subjective responsiveness | Not verified; computer use is currently excluded |
 | MP4 engine, update installation/rollback, other-machine/DPI checks | Pending |
 
-The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 9,164,288 bytes. Its SHA-256 is:
+The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 9,168,384 bytes. Its SHA-256 is:
 
 ```text
-86117459632099cc8eb3ab2b8604be5bb600e35608a4f625ac0dbd784781948d
+883ed158febf5710fec328fe890c5aa93f682bc7b160fd4c2bf2e88b974d5241
 ```
 
 `dist` contains its checksum and license notices and is ignored by Git. Sources, lockfile, scripts, screenshots and the raw current runtime report are committed. No release was published.
@@ -45,6 +45,16 @@ The native diagnostic uses an isolated empty editor with no network or settings 
 The completed run made 4 total UI layouts, 2 rasterizations and 3 presentations across startup and restore; **none occurred in the three settled samples**. Restore did present a valid retained bitmap. CPU values are at `GetProcessTimes` counter resolution and do not claim mathematically zero activity. GPU telemetry and perceptual input latency are unavailable; no claim of fully verified responsiveness or absence of all compositor/driver stalls is made. See [raw runtime evidence](validation/runtime-gate.json).
 
 Earlier runs received real cursor events (including one with 640 movements in five seconds). They were rejected as idle samples rather than treated as passes. This motivated scene comparison: hit-testing still runs on useful input, but unchanged shapes, textures, viewport and scale skip tessellation, rasterization and presentation. Native expose/restore can still blit the retained bitmap when required. No artificial sleep, priority change or FPS cap was introduced.
+
+## Playback flicker regression
+
+The reported flicker was reproduced offscreen through the real editor and CPU rasterizer: a preview request's generic busy flag disabled the toolbar, inspector and timeline, and completing the frame enabled them again. The original single-title fixture changed 35,395 pixels in these surrounding regions solely because a preview was pending.
+
+Preview work is now nonblocking for controls. One explicit Save/Export/other action can wait behind the current preview; progress survives that preview's completion. Revision/generation tokens reject frames and errors from before edits, seeks and playback changes while accepting useful late frames within uninterrupted playback. Fresh image texture handles also avoid the software backend retaining an obsolete cached frame.
+
+The final two-title fixture compares ready, pending and completed UI renders. It recorded **zero changed surrounding pixels** both while pending and after completion, and **3,020 changed video pixels** inside the preview. The generated ready/rendering/completed PNGs were visually inspected under `.test-output/preview-flicker`. Tests additionally cover the queued action, queued export progress and stale-frame/error cases. See [machine-readable playback evidence](validation/preview-flicker.json).
+
+This is deterministic component/raster evidence, not a native playback-presentation or perceptual responsiveness measurement. No computer use, user media, audio playback or normal settings were used. The packaged EXE, icon resources, checksum, 18 tests and Clippy were verified after the repair.
 
 ## Application icon repair
 

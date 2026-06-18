@@ -1,0 +1,31 @@
+{
+  "test": "ui::tests::preview_rendering_keeps_surrounding_controls_visually_stable",
+  "harness": "real Editor::update and production CPU rasterizer; deterministic preview request/completion channels; no native window or computer use",
+  "fixture": "two synthetic title cards; playback advances from 0.0 to 3.1 seconds",
+  "surrounding_regions": [
+    [
+      0,
+      0,
+      1180,
+      68
+    ],
+    [
+      880,
+      70,
+      1180,
+      570
+    ],
+    [
+      0,
+      600,
+      1180,
+      780
+    ]
+  ],
+  "changed_control_pixels_while_pending": 0,
+  "changed_control_pixels_after_completion": 0,
+  "changed_video_pixels": 3020,
+  "packaged_binary_sha256": "883ed158febf5710fec328fe890c5aa93f682bc7b160fd4c2bf2e88b974d5241",
+  "native_playback_presentation_tested": false,
+  "original_single_title_regression_changed_control_pixels": 35395
+}
