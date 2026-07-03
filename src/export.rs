@@ -68,7 +68,12 @@ pub fn export(
     let parent = destination.parent().unwrap_or(Path::new("."));
     let temp = tempfile::tempdir_in(parent).map_err(|e| e.to_string())?;
     let avi_path = temp.path().join("render.avi");
-    let audio = project.audio.as_deref().map(Audio::read).transpose()?;
+    progress.check()?;
+    let audio = project
+        .audio
+        .as_deref()
+        .map(|path| Audio::read_with_check(path, || progress.check()))
+        .transpose()?;
     let frames = project.frames();
     progress.total.store(frames, Ordering::Relaxed);
     let (w, h) = project.layout.size(project.height);
@@ -267,6 +272,66 @@ mod tests {
         cancel.cancel();
         let cancelled = dir.path().join("cancel.avi");
         assert!(export(&p, &cancelled, Format::Avi, None, &cancel).is_err());
+        assert!(!cancelled.exists());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn compressed_soundtrack_is_interleaved_with_volume_and_repeat_without_changing_source() {
+        let dir = crate::fixture_dir();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/audio/tone.mp3");
+        let original = std::fs::read(&source).unwrap();
+        let mut slide = Slide::title();
+        slide.seconds = 1.5;
+        let project = Project {
+            slides: vec![slide],
+            height: 360,
+            fps: 12,
+            audio: Some(source.clone()),
+            audio_volume: 0.5,
+            audio_loop: true,
+            ..Project::default()
+        };
+        let destination = dir.path().join("soundtrack.avi");
+        export(
+            &project,
+            &destination,
+            Format::Avi,
+            None,
+            &Progress::default(),
+        )
+        .unwrap();
+        let bytes = std::fs::read(&destination).unwrap();
+        let mut at = bytes.windows(4).position(|v| v == b"movi").unwrap() + 4;
+        let mut pcm = Vec::new();
+        let mut video_frames = 0;
+        while &bytes[at..at + 4] != b"idx1" {
+            let size = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize;
+            if &bytes[at..at + 4] == b"01wb" {
+                pcm.extend_from_slice(&bytes[at + 8..at + 8 + size]);
+            }
+            if &bytes[at..at + 4] == b"00dc" {
+                video_frames += 1;
+            }
+            at += 8 + size + (size & 1);
+        }
+        let audio = Audio::read(&source).unwrap();
+        let expected: Vec<u8> = (0..project.frames())
+            .flat_map(|n| audio.frame(n, 12, project.frames(), 0.5, true))
+            .collect();
+        assert_eq!(video_frames, 18);
+        assert_eq!(pcm.len(), 44100 * 2 * 2 * 3 / 2);
+        assert!(pcm == expected);
+        assert!(pcm.iter().any(|&b| b != 0));
+        assert!(std::fs::read(&source).unwrap() == original);
+        let cancel = Progress::default();
+        cancel.cancel();
+        let cancelled = dir.path().join("cancelled.avi");
+        assert!(
+            export(&project, &cancelled, Format::Avi, None, &cancel)
+                .unwrap_err()
+                .contains("cancelled")
+        );
         assert!(!cancelled.exists());
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }

@@ -77,9 +77,14 @@ impl Worker {
                             .map(Event::Photos)
                             .unwrap_or(Event::Cancelled),
                         Job::Music => rfd::FileDialog::new()
-                            .add_filter("PCM 16-bit WAV", &["wav"])
+                            .add_filter(
+                                "Music (MP3, WAV, FLAC, Ogg, M4A, AAC, AIFF)",
+                                slideshow_maker::audio::EXTENSIONS,
+                            )
                             .pick_file()
-                            .map(|p| slideshow_maker::avi::Audio::read(&p).map(|_| Event::Music(p)))
+                            .map(|p| {
+                                slideshow_maker::audio::Audio::read(&p).map(|_| Event::Music(p))
+                            })
                             .transpose()?
                             .unwrap_or(Event::Cancelled),
                         Job::Relink(i) => images()
@@ -291,6 +296,9 @@ impl Editor {
         app.total_input = app.project.duration();
         app.show_settings = screen == "settings";
         app.show_export = screen == "export";
+        if screen == "music" {
+            app.inspector_tab = screens::InspectorTab::Music;
+        }
         app.message = "Your originals stay unchanged.".into();
         if !app.project.slides.is_empty() {
             let image =

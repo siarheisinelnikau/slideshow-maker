@@ -13,12 +13,14 @@ output = root / "docs" / "screenshots"
 scenes = [("editor", "editor.png", "1180x780", "1", True),
           ("settings", "settings.png", "1180x780", "1", True),
           ("export", "export.png", "1180x780", "1", True),
+          ("music", "music.png", "1180x780", "1", True),
           ("editor", "empty-compact.png", "900x640", "1.25", False)]
 for screen, name, size, scale, populated in scenes:
     target = output / name
     command = [str(exe), "--screenshot", str(target), "--screen", screen, "--size", size, "--scale", scale]
     if populated:
-        command += ["--project", str(project)]
+        selected_project = project.with_name("music.slideshow.json") if screen == "music" else project
+        command += ["--project", str(selected_project)]
     result = subprocess.run(command, cwd=root, timeout=15, capture_output=True,
                             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
     if result.returncode:
