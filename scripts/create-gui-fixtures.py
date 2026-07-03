@@ -42,5 +42,7 @@ project = {"format_version": 1, "name": "A weekend to remember", "slides": slide
            "layout": "Landscape", "theme": "Midnight", "transition": "Dissolve", "transition_seconds": 0.7,
            "audio": str(root / "gentle-test-tone.wav"), "audio_volume": 0.7, "audio_loop": True, "fps": 24, "height": 720}
 (root / "sample.slideshow.json").write_text(json.dumps(project, indent=2), encoding="utf-8")
+project["audio"] = str(Path(__file__).resolve().parent.parent / "tests/fixtures/audio/tone.mp3")
+(root / "music.slideshow.json").write_text(json.dumps(project, indent=2), encoding="utf-8")
 (root / "invalid-project.json").write_text('{"unrelated": true}', encoding="utf-8")
 print(root)

@@ -46,13 +46,13 @@ impl Options {
             }
         }
         if !options.output.is_absolute()
-            || !["editor", "settings", "export"].contains(&options.screen.as_str())
+            || !["editor", "settings", "export", "music"].contains(&options.screen.as_str())
             || !(900..=1920).contains(&options.width)
             || !(640..=1080).contains(&options.height)
             || !options.scale.is_finite()
             || !(1.0..=2.0).contains(&options.scale)
         {
-            return Err("Capture requires an absolute output, editor/settings/export screen, size 900–1920 x 640–1080, and scale 1–2".into());
+            return Err("Capture requires an absolute output, editor/settings/export/music screen, size 900–1920 x 640–1080, and scale 1–2".into());
         }
         Ok(options)
     }

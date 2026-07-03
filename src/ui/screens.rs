@@ -206,14 +206,15 @@ impl Editor {
                 InspectorTab::Music => {
                     section(ui, "Add a soundtrack");
                     if let Some(path)=&self.project.audio {ui.add(egui::Label::new(path.file_name().unwrap_or_default().to_string_lossy()).wrap());} else {ui.label("Choose music that belongs to your story.");}
-                    if ui.button("Choose WAV…").clicked() {self.worker.send(Job::Music,"Choosing music…");self.playing=false;}
+                    if ui.button("Choose music…").clicked() {self.worker.send(Job::Music,"Choosing music…");self.playing=false;}
+                    note(ui,"MP3, WAV, FLAC, Ogg, M4A, AAC or AIFF.");
                     if self.project.audio.is_some() {
                         section(ui,"Volume");changed |= ui.add(egui::Slider::new(&mut self.project.audio_volume,0.0..=1.0).show_value(false)).changed();
                         changed |= ui.checkbox(&mut self.project.audio_loop,"Repeat to fill the video").changed();
                         if ui.small_button("Remove soundtrack").clicked(){self.project.audio=None;changed=true;}
                     }
                     ui.add_space(10.0);note(ui,"Music is included in your export. Preview is silent.");
-                    ui.collapsing("Supported audio",|ui|{note(ui,"Use an uncompressed 16-bit WAV file, mono or stereo, 8–96 kHz, up to 128 MiB.");});
+                    ui.collapsing("Supported audio",|ui|{note(ui,"MP3, WAV, FLAC, Ogg Vorbis, M4A (AAC-LC or ALAC), AAC-LC and AIFF. Mono or stereo, 8–96 kHz. Up to 128 MiB per file and 256 MiB after decoding. Protected tracks and HE-AAC are not supported.");});
                 },
             }
         });

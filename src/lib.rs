@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod avi;
 pub mod export;
 pub mod model;
