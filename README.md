@@ -9,7 +9,7 @@ A small Windows photo-story editor for turning family photographs, captions and 
 1. Choose **Add photos** for JPEG, PNG, WebP or BMP images, or **Add title** for a title card.
 2. Select a timeline card. In **Slide**, edit its caption, duration, rotation and framing. **Fit whole photo** preserves every edge; **Fill frame** deliberately crops from the center. JPEG orientation metadata is applied before your rotation.
 3. Use **Left / Right** on the cards to reorder slides. In **Story**, choose landscape, portrait or square, a color template and a transition. You can proportionally fit the story to a total duration; transitions do not subtract from the total.
-4. In **Music**, optionally choose a **PCM 16-bit WAV** soundtrack (mono/stereo, 8–96 kHz, up to 128 MiB), adjust volume and enable repeat. Short tracks otherwise fade into silence.
+4. In **Music**, optionally choose a **MP3, WAV, FLAC, Ogg Vorbis, M4A, AAC or AIFF** soundtrack, adjust volume and enable repeat. Short tracks otherwise fade into silence.
 5. Scrub or play the **silent** preview. Use **Save** for an editable `.slideshow.json` project; **Project** contains New, Open and Save as. Projects reference original media; keep those files available or use **Relink photo** after moving them.
 6. Choose **Export video** for video size, file type and frame rate. Export **AVI** directly, or select your trusted FFmpeg executable in **Settings** for **MP4**. Choose a new destination filename. Export runs in the background with progress and cancellation.
 
@@ -27,11 +27,14 @@ Project files save atomically. Existing export files are never overwritten, incl
 | Intermediate size | AVI is limited to 2 GB, including MP4's intermediate AVI |
 | Input limits | JPEG/PNG/WebP/BMP; still frame of animated sources; transparency flattened over black; decoder allocation capped at 256 MiB, dimensions at 16,000 per side |
 | Composition | Two-photo cache; oriented images scaled to at most 2048 per side; captions use embedded Ubuntu Light |
-| Not supported | Video-clip import, HEIC/RAW, MP3, recorded narration, sound playback, 3D effects, pan/zoom, undo/redo, portable project bundles |
+| Music input | Built-in MP3, WAV, FLAC, Ogg Vorbis, M4A (AAC-LC/ALAC), ADTS AAC-LC and AIFF decoding; mono/stereo, 8–96 kHz; 128 MiB file / 256 MiB decoded PCM limit |
+| Not supported | Video-clip import, HEIC/RAW, recorded narration, sound playback, 3D effects, pan/zoom, undo/redo, portable project bundles |
+
+Music needs no codec installation or external engine. WAV/AIFF integer PCM and floating-point samples are converted to PCM16 for export. Protected tracks, HE-AAC, Ogg Opus and surround sound are unsupported; choose an unprotected stereo track. Preview remains silent.
 
 AVI can be played by many desktop media players; social and mobile services may require MP4. MPEG-4 Part 2 is not H.264 and is accepted by fewer sharing services. MP4 availability depends on the chosen FFmpeg build. Export temporarily needs disk space for AVI, MP4 when selected, and a final publication copy. Failed and cancelled jobs remove their temporary directory. A forced process termination may leave a temporary directory beside the selected output.
 
-FFmpeg is **not bundled, installed, downloaded or executed during this development session**. Its license depends on how it was built; see [engine and asset notices](docs/THIRD_PARTY.md) before packaging one. No codecs, drivers or services are installed by SlideshowMaker.
+FFmpeg is **not bundled, installed or downloaded by SlideshowMaker**. Its optional MP4 conversion still requires separate verification; test audio fixtures were generated independently with an existing libVLC installation, without playback. Its license depends on how it was built; see [engine and asset notices](docs/THIRD_PARTY.md) before packaging one. No codecs, drivers or services are installed by SlideshowMaker.
 
 ## Build and package
 
@@ -73,6 +76,8 @@ These are application-generated captures of the real client area, using the same
 ![SlideshowMaker editor with a photo preview, caption controls and a three-slide timeline](docs/screenshots/editor.png)
 
 ![SlideshowMaker Settings showing the installed version, update preferences and optional MP4 engine](docs/screenshots/settings.png)
+
+![SlideshowMaker Music controls with an MP3 soundtrack, volume and repeat](docs/screenshots/music.png)
 
 Additional verified views: [export options](docs/screenshots/export.png) and [empty editor at 900×640 logical pixels, 125% scale](docs/screenshots/empty-compact.png).
 

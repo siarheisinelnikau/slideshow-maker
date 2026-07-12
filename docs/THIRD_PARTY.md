@@ -12,6 +12,7 @@ Direct crates (exact transitive resolution is in `Cargo.lock`):
 | ab_glyph | Caption glyph rasterization | Apache-2.0 |
 | image | JPEG, PNG, WebP and BMP decoding; JPEG encoding | MIT OR Apache-2.0 |
 | rfd | Native file dialogs | MIT |
+| Symphonia 0.5.5 and its enabled codec/container crates | In-process soundtrack decoding | MPL-2.0 |
 | serde / serde_json | Project/settings/release data | MIT OR Apache-2.0 |
 | semver | Release version comparison | MIT OR Apache-2.0 |
 | sha2 | Update checksums | MIT OR Apache-2.0 |
@@ -22,6 +23,12 @@ Direct crates (exact transitive resolution is in `Cargo.lock`):
 Font notices are retained in `docs/licenses`: Ubuntu Light (Ubuntu Font Licence), Hack Regular (its bundled notices), Noto Emoji (SIL Open Font License), and the egui/emoji icon font (MIT). Ubuntu Light is embedded in exported caption rendering; egui also embeds its default font set. Do not remove the fonts' notices when redistributing.
 
 The [resolved dependency inventory](DEPENDENCY_LICENSES.md) records Cargo license declarations filtered for Windows x64, including build dependencies. Regenerate it with `python scripts/license-inventory.py`. Before public distribution, audit the inventory for the final target and distribute any additional required notices. This is not a claim of a completed transitive legal audit. Full crate license texts can be inspected in the registry source packages.
+
+## Symphonia
+
+The embedded audio decoder uses unmodified Symphonia **0.5.5**, copyright The Project Symphonia Developers, under the Mozilla Public License 2.0. The [complete license text](licenses/Symphonia-MPL-2.0.txt) accompanies the distribution. Corresponding source, including retained source-file notices, is available in the [upstream version tag](https://github.com/pdeljanov/Symphonia/tree/v0.5.5) and the exact [crates.io source package](https://crates.io/crates/symphonia/0.5.5); enabled component package versions are recorded in `Cargo.lock` and the dependency inventory. Application source remains MIT. The [upstream format/codec documentation](https://docs.rs/symphonia/0.5.5/symphonia/) distinguishes AAC-LC from unsupported HE-AAC.
+
+Committed audio fixtures are original mathematical tones, not music. An existing local libVLC 3.0.21 generated their compressed representations for independent tests; neither VLC nor its codecs are application dependencies or release assets. See [fixture provenance](../tests/fixtures/audio/README.md).
 
 ## Optional FFmpeg
 

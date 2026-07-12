@@ -1,6 +1,6 @@
 # Validation record
 
-## Current Windows build — 2026-10-31
+## Current Windows build — 2026-11-01
 
 The initial implementation was code-only. The follow-up first attempted computer use, which the user stopped with Escape. Under the latest instruction **no computer use was invoked**: static design review uses bounded application-generated PNGs, while a separate native diagnostic exercises only its own window lifecycle. All data is synthetic. No audio was played, updates installed, user media opened, system settings changed, or remote Git operations performed.
 
@@ -8,25 +8,41 @@ The initial implementation was code-only. The follow-up first attempted computer
 | --- | --- |
 | Formatting | Passed |
 | Clippy on all targets with `-D warnings` | Passed |
-| Rust tests | 18 passed: 9 core, 9 desktop/UI/raster regressions |
+| Rust tests | 23 passed: 14 core/audio/export, 9 desktop/UI/raster regressions |
 | Optimized Windows x64 build with static MSVC runtime | Passed |
 | Executable/asset verification | Passed: x64 GUI PE, matching SHA-256, no imported OpenGL/Direct3D/DXGI or MSVC redistributable DLL |
 | Real editor, Settings and export client-area captures | Passed at 1180×780, 100% scale |
 | Empty editor capture at minimum logical size | Passed at 900×640, 125% scale (1125×800 PNG) |
-| Capture process lifecycle | All four children rendered three settled frames and exited successfully, under an external 15-second limit |
-| Native visible-idle / hidden / restored-idle gate | Passed on the prior CPU/GDI build; baseline report preserved below |
+| Capture process lifecycle | Existing editor/Settings/export/empty captures retained; new Music captures rendered three settled frames and exited under an external 15-second limit |
+| Native visible-idle / hidden / restored-idle gate | Current hidden/restored samples passed; visible sample rejected for input contamination. Prior complete clean baseline retained below |
 | Embedded icon resources | Passed; all eleven 32-bit 16–256 px images match the ICO source |
 | Native window/title-bar and taskbar icons | Passed in a hidden, render-free probe; 16×16 and 32×32 at 100% scale |
 | Normal interactive input, native file dialogs and subjective responsiveness | Not verified; computer use is currently excluded |
 | MP4 engine, update installation/rollback, other-machine/DPI checks | Pending |
 
-The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 9,168,384 bytes. Its SHA-256 is:
+The current asset is `dist/SlideshowMaker-v0.1.0.exe`, 10,852,864 bytes. Its SHA-256 is:
 
 ```text
-883ed158febf5710fec328fe890c5aa93f682bc7b160fd4c2bf2e88b974d5241
+36c077c4c0a28b23f2582a67806600ae77b30c79d2706211ad681ae4fd99f869
 ```
 
 `dist` contains its checksum and license notices and is ignored by Git. Sources, lockfile, scripts, screenshots and the raw current runtime report are committed. No release was published.
+
+## Soundtrack format verification
+
+The application now decodes MP3, WAV, FLAC, Ogg Vorbis, M4A (AAC-LC/ALAC), ADTS AAC-LC and AIFF in its existing background media worker using Symphonia 0.5.5. Neither music import nor AVI export needs an external engine. Existing project schema and audio paths remain compatible. The Music action is now **Choose music…**, with the common formats listed directly below it.
+
+Committed original tones exercise real MP3, FLAC, Ogg Vorbis, AAC-LC/M4A, AAC-LC/ADTS, WAV and AIFF files. Tests check 44.1 kHz stereo channel order, tone amplitude, decoded duration and lossless sample agreement within the independent encoder's one-bit rounding tolerance. Additional generated WAV fixtures check mono 24-bit integer/32-bit float conversion at 48 kHz, sample clipping, rejection of surround/192 kHz, empty/invalid/truncated files, compressed-input/decoded-sample limits and packet-level cancellation. M4A/ALAC is enabled upstream but not separately covered by an ALAC fixture. See [fixture provenance](../tests/fixtures/audio/README.md).
+
+A real 18-frame, 1.5-second AVI export from MP3 was parsed independently of the writer. Its 264,600 audio bytes matched the expected volume, fades and repetition exactly; source bytes were unchanged. Cancellation left no destination or temporary directory. No audio was played. The complete 23-test run includes the prior preview-flicker regression; Clippy and formatting passed.
+
+The packaged binary produced a new [Music client-area screenshot](screenshots/music.png) at 1180×780/100% and an additional 900×640/125% capture under `.test-output/music-compact.png`. Both real images were visually inspected. The inspector retains its vertical scrolling at compact heights. Unchanged editor/Settings/export captures remain accurate.
+
+## Current audio build runtime sample
+
+One bounded diagnostic of the current executable (PID 13576, matching the SHA-256 above) exited normally. The initial five-second visible sample received 843 `CursorMoved` and three boundary events: 3,359 layouts, four rasterizations/presentations and 7.19% of one core. It was **rejected as an idle sample**, and the overall gate report correctly says `passed: false`; no repeat run or synthetic input was used. This sample does not establish settled visible-idle behavior.
+
+The same process's five-second hidden and restored-idle samples each had **zero layouts, rasterizations and presentations**, no window events and 0.00% one-core CPU at counter resolution. Restore presented successfully. See [raw current runtime evidence](validation/audio-runtime-gate.json). The separate hidden icon probe passed for this exact executable with zero UI frames and 16×16/32×32 native icons. GPU telemetry and subjective input responsiveness remain unverified; the earlier complete clean baseline below is historical evidence, not a current full pass.
 
 ## Rendering/load baseline before the icon-resource repair
 
@@ -68,7 +84,7 @@ The small artwork was visually reviewed on light and dark backgrounds in [the ic
 
 The distributable supports a developer-only offscreen capture path, parsed before ordinary startup. It uses the same UI construction, fonts, design tokens, compositor preview and CPU rasterizer, with no native window, network request, normal settings read/write or audio playback. The image is the application's real **client area**, not a mockup, desktop screenshot, title bar or native dialog. Each capture has an internal eight-frame/eight-second limit and an external 15-second limit.
 
-Reviewed PNGs: [editor](screenshots/editor.png), [Settings](screenshots/settings.png), [export](screenshots/export.png), [compact empty state at 125%](screenshots/empty-compact.png). The adjacent `.png.json` files record dimensions, scale, frame count and elapsed time. All four images were decoded and visually inspected with a local image viewer.
+Reviewed PNGs: [editor](screenshots/editor.png), [Settings](screenshots/settings.png), [Music](screenshots/music.png), [export](screenshots/export.png), [compact empty state at 125%](screenshots/empty-compact.png). The adjacent `.png.json` files record dimensions, scale, frame count and elapsed time. All five committed images were decoded and visually inspected with a local image viewer.
 
 Corrections found through these captures: timeline cards inheriting horizontal flow, unsupported arrow glyphs, double-applied scale at 125%, empty-state cursor advancement, export-dialog clipping, and an upstream rectangle rasterizer texture overrun at fractional photo scales. The shared renderer now uses the safe triangle path while keeping caching/other optimizations. A regression verifies the scaled image center and last edge pixel.
 
