@@ -49,6 +49,7 @@ struct Desktop {
     error: Option<String>,
     counters: Counters,
     diagnostic: Option<Diagnostic>,
+    cleanup: Option<std::path::PathBuf>,
 }
 impl Desktop {
     fn visible(&self) -> bool {
@@ -246,6 +247,14 @@ impl ApplicationHandler<Wake> for Desktop {
                     Editor::new(self.ctx.clone())
                 });
                 self.needs_ui = true;
+                if let Some(directory) = self.cleanup.take() {
+                    match slideshow_maker::updater::config() {
+                        Ok(config) => {
+                            rust_auto_updator::cleanup_after_update(directory, config.install)
+                        }
+                        Err(error) => eprintln!("Could not clean update staging: {error}"),
+                    }
+                }
             }
             Err(error) => self.fail(event_loop, error),
         }
@@ -324,6 +333,10 @@ impl ApplicationHandler<Wake> for Desktop {
     }
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
+        if !self.visible() {
+            // Keep dirty state for restore, but discard cosmetic repaint deadlines.
+            self.deadline = None;
+        }
         if self.deadline.is_some_and(|at| at <= now) {
             self.deadline = None;
             self.needs_ui = true;
@@ -380,15 +393,21 @@ fn cpu_seconds() -> f64 {
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {
-    run_internal(None)
+    run_internal(None, None)
+}
+pub fn run_updated(directory: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+    run_internal(None, Some(directory))
 }
 pub fn run_diagnostic(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
     if !path.is_absolute() {
         return Err("Diagnostic report path must be absolute".into());
     }
-    run_internal(Some(path))
+    run_internal(Some(path), None)
 }
-fn run_internal(diagnostic: Option<std::path::PathBuf>) -> Result<(), Box<dyn Error>> {
+fn run_internal(
+    diagnostic: Option<std::path::PathBuf>,
+    cleanup: Option<std::path::PathBuf>,
+) -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::<Wake>::with_user_event().build()?;
     let proxy = event_loop.create_proxy();
     let ctx = egui::Context::default();
@@ -417,6 +436,7 @@ fn run_internal(diagnostic: Option<std::path::PathBuf>) -> Result<(), Box<dyn Er
         error: None,
         counters: Counters::default(),
         diagnostic: diagnostic.map(Diagnostic::new),
+        cleanup,
     };
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop.run_app(&mut app)?;

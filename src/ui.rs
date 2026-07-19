@@ -242,7 +242,6 @@ pub struct Editor {
     staged: Option<Staged>,
     discard: Option<Discard>,
     allow_close: bool,
-    installing: bool,
 }
 impl Editor {
     pub fn new(ctx: egui::Context) -> Self {
@@ -286,7 +285,6 @@ impl Editor {
             staged: None,
             discard: None,
             allow_close: false,
-            installing: false,
         }
     }
     pub(crate) fn for_capture(ctx: egui::Context, project: Project, screen: &str) -> Result<Self> {
@@ -614,11 +612,8 @@ impl Editor {
         if let Some(progress) = &self.progress {
             progress.cancel();
         }
-        if let Some(staged) = self.staged.take()
-            && !self.installing
-        {
-            let _ = std::fs::remove_file(staged.path);
-        }
+        // Prepared owns its staging directory and removes it unless handed off.
+        self.staged.take();
     }
 }
 
@@ -911,26 +906,6 @@ mod tests {
         assert_eq!(app.selected, 0);
         assert!(!app.net_busy);
         assert!(!app.project.duration().is_sign_negative());
-    }
-    #[test]
-    fn ordinary_close_removes_staged_download_without_installing() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".test-output");
-        std::fs::create_dir_all(&root).unwrap();
-        let dir = tempfile::tempdir_in(root).unwrap();
-        let path = dir.path().join("unused-update.exe");
-        std::fs::write(&path, b"synthetic staged data").unwrap();
-        let mut app = editor();
-        app.staged = Some(Staged {
-            path: path.clone(),
-            target: dir.path().join("app.exe"),
-            version: semver::Version::new(0, 2, 0),
-        });
-        app.discard_action(Discard::Close, &egui::Context::default());
-        app.shutdown();
-        assert!(
-            !path.exists(),
-            "Closing without installing must discard the staged download"
-        );
     }
     #[test]
     fn pointer_motion_over_empty_canvas_does_not_require_repainting() {

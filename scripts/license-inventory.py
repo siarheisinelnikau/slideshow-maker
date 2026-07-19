@@ -20,7 +20,7 @@ for package in sorted(metadata["packages"], key=lambda p: (p["name"], p["version
         continue
     license_text = (package.get("license") or "Review upstream license file").replace("|", "\\|")
     repository = package.get("repository")
-    upstream = f"[source]({repository})" if repository else "See registry package"
+    upstream = f"[source]({repository})" if repository else ("Local companion workspace" if package.get("source") is None else "See registry package")
     lines.append(f"| {package['name']} | {package['version']} | {license_text} | {upstream} |")
 (root / "docs" / "DEPENDENCY_LICENSES.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 print(f"Recorded {len(metadata['packages']) - 1} dependency license declarations.")
