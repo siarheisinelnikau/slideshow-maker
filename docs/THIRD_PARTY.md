@@ -14,11 +14,9 @@ Direct crates (exact transitive resolution is in `Cargo.lock`):
 | rfd | Native file dialogs | MIT |
 | Symphonia 0.5.5 and its enabled codec/container crates | In-process soundtrack decoding | MPL-2.0 |
 | serde / serde_json | Project/settings/release data | MIT OR Apache-2.0 |
-| semver | Release version comparison | MIT OR Apache-2.0 |
-| sha2 | Update checksums | MIT OR Apache-2.0 |
+| rust-auto-updator (local companion) | Release selection, downloads, integrity, native replacement and rollback | MIT; notice in `licenses/rust-auto-updator-MIT.txt` |
 | tempfile | Atomic storage and temporary output ownership | MIT OR Apache-2.0 |
 | winresource (build only) | Embed Windows icon and version resources | MIT |
-| ureq | Public HTTPS update requests | MIT OR Apache-2.0 |
 
 Font notices are retained in `docs/licenses`: Ubuntu Light (Ubuntu Font Licence), Hack Regular (its bundled notices), Noto Emoji (SIL Open Font License), and the egui/emoji icon font (MIT). Ubuntu Light is embedded in exported caption rendering; egui also embeds its default font set. Do not remove the fonts' notices when redistributing.
 

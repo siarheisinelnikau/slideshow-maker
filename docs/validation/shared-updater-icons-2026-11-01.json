@@ -1,0 +1,173 @@
+{
+  "executable": "E:\\work\\github\\slideshow-maker\\dist\\SlideshowMaker-v0.1.0.exe",
+  "source": "E:\\work\\github\\slideshow-maker\\assets\\SlideshowMaker.ico",
+  "proof": "LoadLibraryEx resource-only -> LoadImageW group 1 -> DrawIconEx memory DIB",
+  "surfaces": "light/dark native-size icon resource proof; no application/desktop windows, no OS tray interaction",
+  "frames": [
+    {
+      "size": 16,
+      "alpha_bounds": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "visible_bounds": [
+        1,
+        1,
+        15,
+        15
+      ]
+    },
+    {
+      "size": 20,
+      "alpha_bounds": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "visible_bounds": [
+        1,
+        1,
+        19,
+        19
+      ]
+    },
+    {
+      "size": 24,
+      "alpha_bounds": [
+        0,
+        0,
+        24,
+        24
+      ],
+      "visible_bounds": [
+        1,
+        1,
+        23,
+        23
+      ]
+    },
+    {
+      "size": 32,
+      "alpha_bounds": [
+        0,
+        0,
+        32,
+        32
+      ],
+      "visible_bounds": [
+        2,
+        2,
+        31,
+        31
+      ]
+    },
+    {
+      "size": 40,
+      "alpha_bounds": [
+        0,
+        0,
+        40,
+        40
+      ],
+      "visible_bounds": [
+        2,
+        2,
+        38,
+        38
+      ]
+    },
+    {
+      "size": 48,
+      "alpha_bounds": [
+        0,
+        0,
+        48,
+        48
+      ],
+      "visible_bounds": [
+        2,
+        2,
+        46,
+        46
+      ]
+    },
+    {
+      "size": 64,
+      "alpha_bounds": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "visible_bounds": [
+        3,
+        3,
+        61,
+        61
+      ]
+    },
+    {
+      "size": 96,
+      "alpha_bounds": [
+        2,
+        2,
+        94,
+        94
+      ],
+      "visible_bounds": [
+        4,
+        4,
+        92,
+        92
+      ]
+    },
+    {
+      "size": 128,
+      "alpha_bounds": [
+        3,
+        3,
+        125,
+        125
+      ],
+      "visible_bounds": [
+        6,
+        6,
+        122,
+        122
+      ]
+    },
+    {
+      "size": 192,
+      "alpha_bounds": [
+        6,
+        6,
+        186,
+        186
+      ],
+      "visible_bounds": [
+        9,
+        9,
+        183,
+        183
+      ]
+    },
+    {
+      "size": 256,
+      "alpha_bounds": [
+        9,
+        9,
+        247,
+        247
+      ],
+      "visible_bounds": [
+        12,
+        12,
+        244,
+        244
+      ]
+    }
+  ]
+}

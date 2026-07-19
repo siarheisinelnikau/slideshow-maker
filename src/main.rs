@@ -9,6 +9,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     if arguments
         .first()
+        .is_some_and(|flag| flag == "--apply-update")
+    {
+        if arguments.len() != 1 {
+            return Err("Invalid update helper arguments".into());
+        }
+        return rust_auto_updator::apply_update(&slideshow_maker::updater::config()?)
+            .map_err(Into::into);
+    }
+    if arguments
+        .first()
+        .is_some_and(|flag| flag == "--cleanup-update")
+    {
+        if arguments.len() != 2 {
+            return Err("Use --cleanup-update DIRECTORY".into());
+        }
+        return desktop::run_updated(arguments[1].clone().into());
+    }
+    if arguments
+        .first()
         .is_some_and(|flag| flag == "--verify-native-icons")
     {
         if arguments.len() != 2 {

@@ -390,9 +390,9 @@ impl Editor {
             if ui.add_enabled(!self.net_busy,Button::new("Check for updates")).clicked(){self.check_updates(ctx);}
             if self.update_text.chars().count()>180 {ui.label("Unable to check for updates right now.");ui.collapsing("Details",|ui|{ui.label(&self.update_text);});}else{ui.label(&self.update_text);}
             if self.update.is_some() && self.staged.is_none() && ui.add_enabled(!self.net_busy,primary("Download and install")).clicked(){self.download(ctx);}
-            if self.net_busy && let Some(update)=&self.update {ui.add(egui::ProgressBar::new(self.downloaded.load(Ordering::Relaxed) as f32/update.size as f32).show_percentage());ctx.request_repaint_after(Duration::from_millis(250));}
-            if let Some(staged)=&self.staged {
-                if ui.add_enabled(!self.dirty && !self.worker.blocks_ui() && !self.save_settings,primary("Restart to install update")).clicked(){match updater::restart_install(staged){Ok(())=>{self.installing=true;self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}}
+            if self.net_busy && let Some(update)=&self.update {ui.add(egui::ProgressBar::new(self.downloaded.load(Ordering::Relaxed) as f32/update.executable_size() as f32).show_percentage());ctx.request_repaint_after(Duration::from_millis(250));}
+            if let Some(staged)=&mut self.staged {
+                if ui.add_enabled(!self.dirty && !self.worker.blocks_ui() && !self.save_settings,primary("Restart to install update")).clicked(){match updater::restart_install(staged){Ok(())=>{self.allow_close=true;ctx.send_viewport_cmd(egui::ViewportCommand::Close);},Err(e)=>self.update_text=e}}
                 if self.dirty{note(ui,"Save your project before restarting.");}
             }
             ui.add_space(8.0);ui.separator();section(ui,"MP4 export");
