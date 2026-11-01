@@ -225,7 +225,9 @@ mod tests {
                 // checking channel order, non-silence and sample conversion independently.
                 let samples: Vec<_> = audio
                     .samples
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|s| s[channel] as f64)
                     .collect();
                 let n = samples.len() as f64;

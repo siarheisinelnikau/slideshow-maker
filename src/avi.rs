@@ -214,7 +214,7 @@ mod tests {
             u32::from_le_bytes(bytes[idx + 4..idx + 8].try_into().unwrap()),
             64
         );
-        for entry in bytes[idx + 8..].chunks_exact(16) {
+        for entry in bytes[idx + 8..].as_chunks::<16>().0 {
             let offset = u32::from_le_bytes(entry[8..12].try_into().unwrap()) as usize;
             assert_eq!(&bytes[movi + offset..movi + offset + 4], &entry[0..4]);
         }
