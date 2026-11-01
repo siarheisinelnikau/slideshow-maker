@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
-exe = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "dist" / "SlideshowMaker-v0.1.0.exe"
+exe = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "dist" / "SlideshowMaker-v0.2.0.exe"
 report = root / ".test-output" / "gui-check" / f"runtime-gate-{time.time_ns()}.json"
 report.parent.mkdir(parents=True, exist_ok=True)
 process = subprocess.Popen([str(exe), "--diagnostic-report", str(report)], cwd=root,

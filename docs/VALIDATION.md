@@ -1,5 +1,7 @@
 # Validation record
 
+The captured screens, binary hashes and runtime measurements below describe the historical **0.1.0** build. Version **0.2.0** adds localization and appearance controls; its source checks and remaining visual/runtime limits are described in [the current release notes](releases/v0.2.0.md). Historical evidence does not certify the new interface.
+
 ## Current Windows build — 2026-11-01
 
 The initial implementation was code-only. The follow-up first attempted computer use, which the user stopped with Escape. Under the latest instruction **no computer use was invoked**: static design review uses bounded application-generated PNGs, while a separate native diagnostic exercises only its own window lifecycle. All data is synthetic. No audio was played, updates installed, user media opened, system settings changed, or remote Git operations performed.

@@ -2,7 +2,7 @@
 
 A small Windows photo-story editor for turning family photographs, captions and music into a video. Original implementation and templates, with no affiliation to SmartSHOW. Local processing; no accounts, AI services, bundled music, or automatic media uploads.
 
-**Status:** first local implementation, version 0.1.0. Windows x64 is the initial packaging target. The interface uses CPU rasterization and Windows GDI. The planned [GitHub repository](https://github.com/siarheisinelnikau/slideshow-maker) and releases have not been published by this work.
+**Version:** 0.2.0. Windows x64 is the packaging target. The interface uses CPU rasterization and Windows GDI. Source and release downloads belong to the canonical [GitHub repository](https://github.com/siarheisinelnikau/slideshow-maker).
 
 ## Create a video
 
@@ -17,7 +17,7 @@ Project files save atomically. Existing export files are never overwritten, incl
 
 ## Video backend and limits
 
-| Capability | 0.1.0 behavior |
+| Capability | 0.2.0 behavior |
 | --- | --- |
 | Built-in export | AVI 1.0, Motion JPEG, optional interleaved PCM16 audio; no external engine |
 | Optional MP4 | Explicitly selected FFmpeg executable; MPEG-4 Part 2 video and AAC audio, `yuv420p`, fast-start metadata |
@@ -50,7 +50,7 @@ cargo clippy --locked --all-targets -- -D warnings
 powershell -NoProfile -File scripts/package.ps1
 ```
 
-Packaging statically links the MSVC runtime and produces `dist/SlideshowMaker-v0.1.0.exe`, its `.sha256`, and license notices. It does not launch the application or publish anything. The Windows UI uses egui CPU rasterization and softbuffer's GDI bitmap presentation; it does not create an OpenGL or Direct3D device. The event loop waits for input, worker results or animation deadlines, and unchanged window exposures reuse the retained bitmap. Windows desktop composition remains an operating-system responsibility. Additional DPI and clean-machine compatibility checks are listed in the validation record. PowerShell policy blocked running `.ps1` files in the initial session; the release build was invoked directly through Cargo without changing that policy.
+Packaging statically links the MSVC runtime and produces `dist/SlideshowMaker-v0.2.0.exe`, its `.sha256`, and license notices. It does not launch the application or publish anything. The Windows UI uses egui CPU rasterization and softbuffer's GDI bitmap presentation; it does not create an OpenGL or Direct3D device. The event loop waits for input, worker results or animation deadlines, and unchanged window exposures reuse the retained bitmap. Windows desktop composition remains an operating-system responsibility. Additional DPI and clean-machine compatibility checks are listed in the validation record. PowerShell policy blocked running `.ps1` files in the initial session; the release build was invoked directly through Cargo without changing that policy.
 
 For a safe, headless synthetic export (no UI, playback, or network):
 
@@ -63,6 +63,8 @@ The second command uses an **already installed** `opencv-python` decoder; it is 
 
 ## Settings and updates
 
+Open **Settings → Appearance** to choose **English, Русский, Français, Deutsch, Español or Italiano**, and **Light** or **Dark**. Both choices apply without restarting and save automatically. Existing installations retain their startup-update and FFmpeg preferences and start in English with the established dark appearance. Interface text, help, progress, update controls and native file-picker filters are localized; project names, captions, media paths and diagnostic details remain their original content. New projects and title cards receive localized starter text, which remains editable project data.
+
 **Settings** shows the installed version, **Check for updates**, and a persistent **Check for updates on startup** toggle (enabled by default). Disabling it makes no update request at the next launch. Settings are stored under `%APPDATA%/SlideshowMaker/settings.json`. Startup checks use a separate bounded worker and do not block editing. A nonexistent repository/release, rate limit or network failure is reported as an unavailable check, never as “up to date”; startup errors remain in Settings without a popup.
 
 A newer stable Windows x64 release needs `SlideshowMaker-vVERSION.exe` and `SlideshowMaker-vVERSION.exe.sha256` assets on the canonical repository. **Download and install** stages the official executable, checks its declared length, SHA-256 and x64 PE header, then offers **Restart to install update**. The shared native updater helper waits for the app to exit, replaces the portable executable, restarts it, and rolls back file-operation/start failures. No PowerShell script is needed. Project/media/settings paths are preserved. Read-only installations fail without elevation. The portable executable keeps its installed filename during updates. Checksum assets detect corrupt downloads; they are not a separate code-signing trust root.
@@ -71,7 +73,7 @@ Update installation and rollback have not been exercised. Startup-check persiste
 
 ## Screenshots
 
-These are application-generated captures of the real client area, using the same egui components, fonts and CPU rasterizer as the Windows application. They show original synthetic postcard media, not user photographs. Native title bars, file dialogs and mouse/keyboard behavior are outside these captures.
+These historical **0.1.0** application-generated captures show the real client area, using the same egui components, fonts and CPU rasterizer as the Windows application. They show original synthetic postcard media, not user photographs. Native title bars, file dialogs and mouse/keyboard behavior are outside these captures. The 0.2.0 Appearance controls and light theme have not been recaptured: current repository instructions require source-only verification without launching the application. Updated editor and Settings screenshots, translated text layout and new runtime idle/hidden measurements remain pending.
 
 ![SlideshowMaker editor with a photo preview, caption controls and a three-slide timeline](docs/screenshots/editor.png)
 
@@ -85,23 +87,23 @@ To reproduce the bounded captures with Python/Pillow already installed:
 
 ```powershell
 python scripts/create-gui-fixtures.py
-python scripts/capture-review.py dist/SlideshowMaker-v0.1.0.exe
+python scripts/capture-review.py dist/SlideshowMaker-v0.2.0.exe
 ```
 
 Each capture starts a separate isolated process, uses no network or normal settings, renders three settled frames, writes PNG/metadata and exits. Direct invocation is also available:
 
 ```powershell
-./dist/SlideshowMaker-v0.1.0.exe --screenshot E:/work/github/slideshow-maker/.test-output/review.png --screen settings --size 1180x780 --scale 1
+./dist/SlideshowMaker-v0.2.0.exe --screenshot E:/work/github/slideshow-maker/.test-output/review.png --screen settings --size 1180x780 --scale 1
 ```
 
-For a separate bounded native rendering check, run `python scripts/verify-runtime.py dist/SlideshowMaker-v0.1.0.exe`. It samples visible idle, hidden and restored idle states, then exits automatically; it does not use computer use or simulate input. The recorded clean five-second samples each had zero UI layouts, rasterizations and presentations, and 0.00% CPU of one core at system-counter resolution. This supports idle/hidden efficiency, not a claim that subjective input responsiveness or GPU/compositor behavior has been fully verified.
+For a separate bounded native rendering check, run `python scripts/verify-runtime.py dist/SlideshowMaker-v0.2.0.exe`. It samples visible idle, hidden and restored idle states, then exits automatically; it does not use computer use or simulate input. The historical 0.1.0 clean five-second samples each had zero UI layouts, rasterizations and presentations, and 0.00% CPU of one core at system-counter resolution. This supports idle/hidden efficiency, not a claim that subjective input responsiveness or GPU/compositor behavior has been fully verified.
 
-See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and [initial release draft](docs/RELEASE_NOTES.md). Source code is MIT licensed; embedded fonts and dependencies retain their licenses.
+See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and [0.2.0 release notes](docs/releases/v0.2.0.md). Source code is MIT licensed; embedded fonts and dependencies retain their licenses.
 
 ## Shared updater source
 
-Build with Rust 1.95 or newer and keep `rust-auto-updator` beside this repository. Cargo uses `../rust-auto-updator/crates/rust-auto-updator`; the companion workspace is currently local and unpublished. A standalone clone/CI checkout must provision that source before building. `src/updater.rs` contains only this product's identity and checksum/staging configuration; release discovery, integrity checks, downloads, replacement, rollback and cleanup live in the companion core. The existing per-executable `.sha256` release contract and saved startup preference are preserved. Earlier versions' PowerShell helpers can still install this EXE and relaunch it without flags. Future versions use the shared `--apply-update` and `--cleanup-update` protocol.
+Build with Rust 1.95 or newer and keep `rust-auto-updator` beside this repository. Cargo uses `../rust-auto-updator/crates/rust-auto-updator`; a standalone clone/CI checkout must provision the companion revision pinned by `scripts/provision-shared-updater.ps1` before building. `src/updater.rs` contains only this product's identity and checksum/staging configuration; release discovery, integrity checks, downloads, replacement, rollback and cleanup live in the companion core. The existing per-executable `.sha256` release contract and saved startup preference are preserved. Earlier versions' PowerShell helpers can still install this EXE and relaunch it without flags. Future versions use the shared `--apply-update` and `--cleanup-update` protocol.
 
-Icon proof without launching the application: `python scripts/verify-icon-pixels.py dist/SlideshowMaker-v0.1.0.exe assets/SlideshowMaker.ico .test-output/icons.png` uses Pillow and the native resource-only loader plus DrawIconEx into memory bitmaps. It verifies nonblank native-sized frames on light/dark backgrounds; this is an icon resource proof, not an OS tray screenshot. SlideshowMaker intentionally has no tray icon.
+Icon proof without launching the application: `python scripts/verify-icon-pixels.py dist/SlideshowMaker-v0.2.0.exe assets/SlideshowMaker.ico .test-output/icons.png` uses Pillow and the native resource-only loader plus DrawIconEx into memory bitmaps. It verifies nonblank native-sized frames on light/dark backgrounds; this is an icon resource proof, not an OS tray screenshot. SlideshowMaker intentionally has no tray icon.
 
 Current migration evidence and runtime limits: [shared updater, icon and rendering audit](docs/UPDATER-AUDIT-2026-11-01.md).
