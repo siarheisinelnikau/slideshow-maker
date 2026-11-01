@@ -53,12 +53,12 @@ mod tests {
         let config = config().unwrap();
         let json = |origin: &str| {
             serde_json::json!({
-            "tag_name":"v0.2.0", "html_url":format!("{origin}/releases/tag/v0.2.0"),
+            "tag_name":"v0.3.0", "html_url":format!("{origin}/releases/tag/v0.3.0"),
             "draft":false,"prerelease":false,"assets":[
-                {"name":"SlideshowMaker-v0.2.0.exe","size":2048,
-                 "browser_download_url":format!("{origin}/releases/download/v0.2.0/SlideshowMaker-v0.2.0.exe")},
-                {"name":"SlideshowMaker-v0.2.0.exe.sha256","size":100,
-                 "browser_download_url":format!("{origin}/releases/download/v0.2.0/SlideshowMaker-v0.2.0.exe.sha256")}
+                {"name":"SlideshowMaker-v0.3.0.exe","size":2048,
+                 "browser_download_url":format!("{origin}/releases/download/v0.3.0/SlideshowMaker-v0.3.0.exe")},
+                {"name":"SlideshowMaker-v0.3.0.exe.sha256","size":100,
+                 "browser_download_url":format!("{origin}/releases/download/v0.3.0/SlideshowMaker-v0.3.0.exe.sha256")}
             ]
         }).to_string()
         };
@@ -69,7 +69,7 @@ mod tests {
             release
                 .checksum_url()
                 .unwrap()
-                .ends_with("SlideshowMaker-v0.2.0.exe.sha256")
+                .ends_with("SlideshowMaker-v0.3.0.exe.sha256")
         );
         assert!(
             rust_auto_updator::parse_release(&json("https://github.com/other/app"), &config)

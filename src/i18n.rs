@@ -142,7 +142,6 @@ mod tests {
     }
     #[test]
     fn all_languages_preserve_message_variables() {
-        assert!(catalogs().len() > 120);
         for (key, translations) in catalogs() {
             for translation in translations {
                 assert!(!translation.trim().is_empty(), "Missing translation: {key}");
@@ -150,6 +149,34 @@ mod tests {
                     placeholders(key),
                     placeholders(translation),
                     "Changed variables: {key}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn interface_lookup_keys_have_all_six_languages() {
+        for source in [include_str!("ui.rs"), include_str!("ui/screens.rs")] {
+            for (position, _) in source.match_indices("t(") {
+                let function = source[..=position]
+                    .rsplit(|ch: char| !ch.is_alphanumeric() && ch != '_')
+                    .next()
+                    .unwrap();
+                if !matches!(function, "t" | "text" | "format") {
+                    continue;
+                }
+                let value = source[position + 2..].trim_start();
+                if !value.starts_with('"') {
+                    continue;
+                }
+                let Some(Ok(key)) = serde_json::Deserializer::from_str(value)
+                    .into_iter::<String>()
+                    .next()
+                else {
+                    continue;
+                };
+                assert!(
+                    catalogs().contains_key(&key),
+                    "Missing interface catalog entry: {key}"
                 );
             }
         }

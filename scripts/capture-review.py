@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 root = Path(__file__).resolve().parent.parent
-exe = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "dist" / "SlideshowMaker-v0.1.0.exe"
+exe = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "dist" / "SlideshowMaker-v0.2.0.exe"
 project = root / ".test-output" / "gui-check" / "sample.slideshow.json"
 output = root / "docs" / "screenshots"
 scenes = [("editor", "editor.png", "1180x780", "1", True),

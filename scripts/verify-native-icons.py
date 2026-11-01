@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 root=Path(__file__).resolve().parent.parent
-exe=Path(sys.argv[1]).resolve() if len(sys.argv)>1 else root/'dist/SlideshowMaker-v0.1.0.exe'
+exe=Path(sys.argv[1]).resolve() if len(sys.argv)>1 else root/'dist/SlideshowMaker-v0.2.0.exe'
 report=root/'.test-output'/f'native-icons-{time.time_ns()}.json'
 report.parent.mkdir(exist_ok=True)
 result=subprocess.run([str(exe),'--verify-native-icons',str(report)],cwd=root,timeout=7,capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW if sys.platform=='win32' else 0)
