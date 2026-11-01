@@ -27,8 +27,43 @@ jobs:
       - run: cargo run --locked --example render_fixture
       - run: ./scripts/package.ps1
         shell: pwsh
-      - run: python scripts/verify-release.py dist/SlideshowMaker-v0.1.0.exe
+      - name: Inspect the current versioned release executable
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content -LiteralPath Cargo.toml -Raw), '(?m)^version\s*=\s*"(\d+\.\d+\.\d+)"').Groups[1].Value
+          if (-not $version) { throw 'Cannot read the release package version.' }
+          python scripts/verify-release.py "dist/SlideshowMaker-v$version.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Release executable inspection failed.' }
       - uses: actions/upload-artifact@v4
         with:
           name: SlideshowMaker-Windows-x64
           path: dist/
+
+  localization-release:
+    name: Publish the explicitly requested localization release
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release localization v')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: localization-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: SlideshowMaker-Windows-x64
+          path: .release-input
+      - name: Verify the checked executable, companion and notices
+        shell: pwsh
+        run: ./scripts/stage-localization-release.ps1
+      - name: Publish only after every asset is verified
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const publish = require('./scripts/publish-localization-release.cjs');
+            await publish({github, context, core});
