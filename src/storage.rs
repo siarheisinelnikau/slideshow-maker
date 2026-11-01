@@ -49,12 +49,16 @@ pub fn save_project(path: &Path, project: &Project) -> Result<()> {
 pub struct Settings {
     pub startup_updates: bool,
     pub ffmpeg: Option<PathBuf>,
+    pub language: crate::i18n::Language,
+    pub theme: crate::i18n::UiTheme,
 }
 impl Default for Settings {
     fn default() -> Self {
         Self {
             startup_updates: true,
             ffmpeg: None,
+            language: Default::default(),
+            theme: Default::default(),
         }
     }
 }
@@ -75,6 +79,22 @@ pub fn load_settings() -> Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn existing_settings_keep_preferences_and_new_choices_roundtrip() {
+        let mut settings: Settings =
+            serde_json::from_str(r#"{"startup_updates":false,"ffmpeg":"trusted.exe"}"#).unwrap();
+        assert!(!settings.startup_updates);
+        assert_eq!(settings.language, crate::i18n::Language::English);
+        assert_eq!(settings.theme, crate::i18n::UiTheme::Dark);
+        settings.language = crate::i18n::Language::Italian;
+        settings.theme = crate::i18n::UiTheme::Light;
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.language, settings.language);
+        assert_eq!(restored.theme, settings.theme);
+        assert_eq!(restored.ffmpeg, settings.ffmpeg);
+        assert!(!restored.startup_updates);
+    }
     #[test]
     fn project_roundtrip_and_reject_unknown_version() {
         let dir = crate::fixture_dir();
