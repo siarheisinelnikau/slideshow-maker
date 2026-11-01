@@ -81,12 +81,12 @@ pub(super) fn configure(ctx: &egui::Context, theme: UiTheme) {
     style.visuals.window_fill = colors.surface;
     style.visuals.extreme_bg_color = colors.canvas;
     style.visuals.faint_bg_color = colors.background;
-    style.visuals.window_stroke = Stroke::new(1.0, colors.border);
+    style.visuals.window_stroke = Stroke::new(1.0_f32, colors.border);
     style.visuals.window_corner_radius = CornerRadius::same(12);
     style.visuals.selection.bg_fill = colors.selected;
-    style.visuals.selection.stroke = Stroke::new(1.0, colors.accent);
-    style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, colors.border);
-    style.visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, colors.text);
+    style.visuals.selection.stroke = Stroke::new(1.0_f32, colors.accent);
+    style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, colors.border);
+    style.visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, colors.text);
     style.visuals.widgets.inactive.bg_fill = colors.surface;
     style.visuals.widgets.inactive.weak_bg_fill = colors.surface;
     style.visuals.widgets.hovered.bg_fill = colors.selected;
@@ -98,7 +98,7 @@ pub(super) fn configure(ctx: &egui::Context, theme: UiTheme) {
         &mut style.visuals.widgets.active,
     ] {
         widget.corner_radius = CornerRadius::same(6);
-        widget.fg_stroke = Stroke::new(1.0, colors.text);
+        widget.fg_stroke = Stroke::new(1.0_f32, colors.text);
     }
     ctx.set_style(style);
 }
@@ -312,7 +312,7 @@ impl Editor {
                                 colors.surface
                             })
                             .stroke(Stroke::new(
-                                1.0,
+                                1.0_f32,
                                 if active { colors.accent } else { colors.border },
                             ))
                             .corner_radius(8)
