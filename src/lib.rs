@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod avi;
 pub mod export;
+pub mod i18n;
 pub mod model;
 pub mod render;
 pub mod storage;

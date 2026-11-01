@@ -2,6 +2,7 @@ use egui::{self, Color32, RichText};
 mod screens;
 use slideshow_maker::{
     export::{self, Format, Progress},
+    i18n::{Language, Message, UiTheme},
     model::*,
     render::Renderer,
     storage::{self, Settings},
@@ -11,7 +12,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU8, AtomicU64, Ordering},
         mpsc::{self, Receiver, SyncSender},
     },
     time::{Duration, Instant},
@@ -54,14 +55,19 @@ struct Worker {
     previewing: bool,
     pending: Option<(Job, String)>,
     label: String,
+    language: Arc<AtomicU8>,
 }
 impl Worker {
-    fn new(ctx: egui::Context) -> Self {
+    fn new(ctx: egui::Context, language: Language) -> Self {
         let (tx, requests) = mpsc::sync_channel(1);
         let (events, rx) = mpsc::sync_channel(1);
+        let language = Arc::new(AtomicU8::new(language as u8));
+        let worker_language = language.clone();
         std::thread::spawn(move || {
             let mut renderer = Renderer::default();
             while let Ok(job) = requests.recv() {
+                let language = Language::from_index(worker_language.load(Ordering::Relaxed));
+                let t = |key: &'static str| language.text(key);
                 let preview_token = match &job {
                     Job::Preview(_, _, token) => Some(*token),
                     _ => None,
@@ -69,7 +75,7 @@ impl Worker {
                 let result = (|| -> Result<Event> {
                     let images = || {
                         rfd::FileDialog::new()
-                            .add_filter("Photos", &["jpg", "jpeg", "png", "webp", "bmp"])
+                            .add_filter(t("Photos"), &["jpg", "jpeg", "png", "webp", "bmp"])
                     };
                     Ok(match job {
                         Job::Import => images()
@@ -78,7 +84,7 @@ impl Worker {
                             .unwrap_or(Event::Cancelled),
                         Job::Music => rfd::FileDialog::new()
                             .add_filter(
-                                "Music (MP3, WAV, FLAC, Ogg, M4A, AAC, AIFF)",
+                                t("Music (MP3, WAV, FLAC, Ogg, M4A, AAC, AIFF)"),
                                 slideshow_maker::audio::EXTENSIONS,
                             )
                             .pick_file()
@@ -92,13 +98,13 @@ impl Worker {
                             .map(|p| Event::Relink(i, p))
                             .unwrap_or(Event::Cancelled),
                         Job::Ffmpeg => rfd::FileDialog::new()
-                            .add_filter("FFmpeg executable", &["exe"])
+                            .add_filter(t("FFmpeg executable"), &["exe"])
                             .pick_file()
                             .map(Event::Ffmpeg)
                             .unwrap_or(Event::Cancelled),
                         Job::Open => {
                             if let Some(path) = rfd::FileDialog::new()
-                                .add_filter("Slideshow project", &["json"])
+                                .add_filter(t("Slideshow project"), &["json"])
                                 .pick_file()
                             {
                                 Event::Opened(storage::load_project(&path)?, path)
@@ -109,8 +115,11 @@ impl Worker {
                         Job::Save(project, path) => {
                             let path = path.or_else(|| {
                                 rfd::FileDialog::new()
-                                    .set_file_name("Family memories.slideshow.json")
-                                    .add_filter("Slideshow project", &["json"])
+                                    .set_file_name(format!(
+                                        "{}.slideshow.json",
+                                        t("Family memories")
+                                    ))
+                                    .add_filter(t("Slideshow project"), &["json"])
                                     .save_file()
                             });
                             if let Some(path) = path {
@@ -167,6 +176,7 @@ impl Worker {
             previewing: false,
             pending: None,
             label: String::new(),
+            language,
         }
     }
     fn send(&mut self, job: Job, label: &str) {
@@ -222,7 +232,7 @@ pub struct Editor {
     preview_revision: u64,
     worker: Worker,
     texture: Option<egui::TextureHandle>,
-    message: String,
+    message: Message,
     playing: bool,
     last_tick: Instant,
     settings: Settings,
@@ -237,7 +247,7 @@ pub struct Editor {
     net_rx: Receiver<NetEvent>,
     net_busy: bool,
     update: Option<Update>,
-    update_text: String,
+    update_text: Message,
     downloaded: Arc<AtomicU64>,
     staged: Option<Staged>,
     discard: Option<Discard>,
@@ -252,10 +262,13 @@ impl Editor {
         app
     }
     fn with_context(ctx: egui::Context, settings: Settings) -> Self {
-        screens::configure(&ctx);
+        screens::configure(&ctx, settings.theme);
         let (net_tx, net_rx) = mpsc::sync_channel(1);
         Self {
-            project: Project::default(),
+            project: Project {
+                name: settings.language.text("Family memories").into(),
+                ..Project::default()
+            },
             path: None,
             dirty: false,
             selected: 0,
@@ -263,7 +276,7 @@ impl Editor {
             revision: 1,
             preview_generation: 1,
             preview_revision: 0,
-            worker: Worker::new(ctx.clone()),
+            worker: Worker::new(ctx.clone(), settings.language),
             texture: None,
             message: "Add photos or a title card to begin. Source files are never modified.".into(),
             playing: false,
@@ -369,7 +382,10 @@ impl Editor {
         self.discard = None;
         match action {
             Discard::New => {
-                self.project = Project::default();
+                self.project = Project {
+                    name: self.settings.language.text("Family memories").into(),
+                    ..Project::default()
+                };
                 self.selected = 0;
                 self.path = None;
                 self.dirty = false;
@@ -397,8 +413,9 @@ impl Editor {
                     for path in paths.into_iter().take(room) {
                         self.project.slides.push(Slide::photo(path));
                     }
-                    self.message = format!(
-                        "Added {count} photos (maximum 500 slides). Select a slide to edit it."
+                    self.message = Message::format(
+                        "Added {count} photos (maximum 500 slides). Select a slide to edit it.",
+                        &[("count", count.to_string())],
                     );
                     self.change();
                 }
@@ -454,20 +471,23 @@ impl Editor {
                     }
                 }
                 Event::Exported(path) => {
-                    self.message = format!("Video exported: {}", path.display())
+                    self.message = Message::format(
+                        "Video exported: {path}",
+                        &[("path", path.display().to_string())],
+                    )
                 }
                 Event::PreviewError(error, token) => {
                     if token.generation == self.preview_generation
                         && (token.revision == self.revision || self.playing)
                     {
-                        self.message = error;
+                        self.message = error.into();
                         self.playing = false;
                         self.preview_revision = self.revision;
                     }
                 }
                 Event::Cancelled => {}
                 Event::Error(e) => {
-                    self.message = e;
+                    self.message = e.into();
                     self.playing = false;
                     self.preview_revision = self.revision;
                 }
@@ -480,23 +500,27 @@ impl Editor {
             self.net_busy = false;
             match event {
                 NetEvent::Checked(Ok(Some(update))) => {
-                    self.update_text = format!("Version {} is available", update.version);
+                    self.update_text = Message::format(
+                        "Version {version} is available",
+                        &[("version", update.version.to_string())],
+                    );
                     self.update = Some(update);
                 }
                 NetEvent::Checked(Ok(None)) => {
                     self.update = None;
                     self.update_text = "You have the latest stable version".into();
                 }
-                NetEvent::Checked(Err(e)) => self.update_text = e,
+                NetEvent::Checked(Err(e)) => self.update_text = e.into(),
                 NetEvent::Downloaded(Ok(staged)) => {
-                    self.update_text = format!(
-                        "Version {} verified and ready. Save your project before restarting.",
-                        staged.version
+                    self.update_text = Message::format(
+                        "Version {version} verified and ready. Save your project before restarting.",
+                        &[("version", staged.version.clone())],
                     );
                     self.staged = Some(staged);
                 }
                 NetEvent::Downloaded(Err(e)) => {
-                    self.update_text = format!("Update download failed: {e}")
+                    self.update_text =
+                        Message::format("Update download failed: {details}", &[("details", e)])
                 }
             }
         }
@@ -505,6 +529,8 @@ impl Editor {
 impl Editor {
     pub fn update(&mut self, ctx: &egui::Context) {
         let ctx = ctx.clone();
+        let language = self.settings.language;
+        let t = |key: &'static str| language.text(key);
         self.receive(&ctx);
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close {
             if self.worker.blocks_ui() || self.net_busy || self.save_settings {
@@ -544,31 +570,38 @@ impl Editor {
         egui::TopBottomPanel::bottom("status").show(&ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 if self.dirty {
-                    ui.colored_label(Color32::YELLOW, "Unsaved changes ·");
+                    ui.colored_label(
+                        if self.settings.theme == UiTheme::Light {
+                            Color32::from_rgb(128, 75, 5)
+                        } else {
+                            Color32::YELLOW
+                        },
+                        t("Unsaved changes ·"),
+                    );
                 }
-                ui.label(&self.message);
+                ui.label(self.message.render(language));
             });
             if let Some(progress) = &self.progress {
                 let n = progress.done.load(Ordering::Relaxed);
                 let total = progress.total.load(Ordering::Relaxed).max(1);
                 ui.horizontal(|ui| {
                     ui.label(if progress.encoding.load(Ordering::Relaxed) {
-                        "Encoding MP4"
+                        t("Encoding MP4")
                     } else {
-                        "Rendering AVI"
+                        t("Rendering AVI")
                     });
                     ui.add(egui::ProgressBar::new(n as f32 / total as f32).show_percentage());
-                    if ui.button("Cancel export").clicked() {
+                    if ui.button(t("Cancel export")).clicked() {
                         progress.cancel();
                     }
                 });
                 ctx.request_repaint_after(Duration::from_millis(150));
             } else if self.worker.blocks_ui() {
-                ui.label(self.worker.foreground_label());
+                ui.label(language.text(self.worker.foreground_label()));
             }
         });
         egui::TopBottomPanel::bottom("timeline")
-            .min_height(176.0)
+            .min_height(200.0)
             .show(&ctx, |ui| self.timeline(ui));
         egui::SidePanel::right("properties")
             .default_width(308.0)
@@ -580,15 +613,16 @@ impl Editor {
         self.settings_window(&ctx);
         self.export_window(&ctx);
         if let Some(action) = self.discard {
-            egui::Window::new("Unsaved project")
+            egui::Window::new(t("Unsaved project"))
+                .id(egui::Id::new("discard-window"))
                 .collapsible(false)
                 .resizable(false)
                 .show(&ctx, |ui| {
-                    ui.label("Save your project first, or discard these changes.");
-                    if ui.button("Keep editing").clicked() {
+                    ui.label(t("Save your project first, or discard these changes."));
+                    if ui.button(t("Keep editing")).clicked() {
                         self.discard = None;
                     }
-                    if ui.button("Discard changes").clicked() {
+                    if ui.button(t("Discard changes")).clicked() {
                         self.discard_action(action, &ctx);
                     }
                 });
@@ -627,6 +661,7 @@ mod tests {
             Settings {
                 startup_updates: false,
                 ffmpeg: None,
+                ..Settings::default()
             },
         )
     }
@@ -641,6 +676,7 @@ mod tests {
                 previewing: false,
                 pending: None,
                 label: String::new(),
+                language: Arc::new(AtomicU8::new(Language::English as u8)),
             },
             requests,
             responses,
@@ -812,6 +848,7 @@ mod tests {
             previewing: false,
             pending: None,
             label: String::new(),
+            language: Arc::new(AtomicU8::new(Language::English as u8)),
         };
         app.playing = true;
         let mut renderer = crate::rasterizer::create();
@@ -916,6 +953,7 @@ mod tests {
             Settings {
                 startup_updates: false,
                 ffmpeg: None,
+                ..Settings::default()
             },
         );
         let mut scene = crate::rasterizer::SceneCache::default();
