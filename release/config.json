@@ -1,0 +1,14 @@
+{
+  "repository": "siarheisinelnikau/slideshow-maker",
+  "product": "SlideshowMaker",
+  "kind": "desktop",
+  "assets": [
+    {
+      "name": "SlideshowMaker-v{version}.exe"
+    }
+  ],
+  "notices": true,
+  "checksum_aliases": [
+    "SlideshowMaker-v{version}.exe.sha256"
+  ]
+}
